@@ -1,8 +1,8 @@
-import { supabase } from '@/lib/supabase/client'
+import { supabaseServer } from '@/lib/supabase/server'
 import Link from 'next/link'
 
 export default async function Home() {
-  const { data: competitions } = await supabase
+  const { data: competitions } = await supabaseServer
     .from('competitions')
     .select('*')
     .order('datetime', { ascending: false })
@@ -10,7 +10,7 @@ export default async function Home() {
   return (
     <div className="container py-8">
       <h1 className="text-xl font-bold mb-6">赛事列表</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {competitions?.map(comp => (
           <div key={comp.id} className="card">
             <div className="p-6">
