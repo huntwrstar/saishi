@@ -6,6 +6,7 @@ export default async function Home() {
     .from('competitions')
     .select('*')
     .order('datetime', { ascending: false })
+    console.log('赛事数据:', competitions?.map(c => ({ id: c.id, name: c.name })));
 
   return (
     <div className="container py-8">
