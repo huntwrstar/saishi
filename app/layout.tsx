@@ -41,7 +41,7 @@ export default async function RootLayout({
                 whiteSpace: 'nowrap',      // 新增：标题不换行
               }}
             >
-              赛事平台
+              鹅城魔方赛事网
             </Link>
             <UserMenu />
           </div>

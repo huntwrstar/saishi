@@ -219,3 +219,18 @@ body {
     font-size: 0.75rem;
   }
 }
+/* 表格水平滚动，单元格不换行 */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  min-width: 600px; /* 保证表格有足够宽度触发滚动，可根据需要调整 */
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  white-space: nowrap;
+}
