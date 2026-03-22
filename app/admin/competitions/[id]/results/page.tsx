@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react'
 import * as React from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
-// 将时间字符串转换为秒数
+// 将时间字符串（如 "1:02.22" 或 "12.34"）转换为秒数
 const parseTimeToSeconds = (timeStr: string): number => {
   const trimmed = timeStr.trim()
   if (trimmed === '') return NaN
+  // 格式: mm:ss.ms 或 ss.ms
   const match = trimmed.match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/)
   if (!match) return parseFloat(trimmed)
-  const minutes = match[1] ? parseInt(match[1]) : 0
+  const minutes = match[1] ? parseInt(match[1], 10) : 0
   const seconds = parseFloat(match[2])
   return minutes * 60 + seconds
 }
@@ -25,6 +26,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
   const [saving, setSaving] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<Record<number, boolean>>({})
   const [groupDataMap, setGroupDataMap] = useState<Map<string, { attemptData: string[]; average: number; best: number; calculation_rule: string }>>(new Map())
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     supabase
@@ -51,6 +53,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       setRegistrations(regs || [])
       setSelectedUserIds(new Set())
       setGroupResults({})
+      setSearchTerm('')
 
       if (!regs || regs.length === 0) return
 
@@ -147,7 +150,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     if (!event) return
     const requiredCount = event.calculation_rule === 'avg_of_3' ? 3 : 5
     const rawInputs = groupResults[activeGroupId] || []
-    // 转换为秒数数组
+    // 将原始字符串转为秒数数组，用于计算
     const attempts = rawInputs.map(s => parseTimeToSeconds(s)).filter(v => !isNaN(v))
     if (attempts.length !== requiredCount) {
       alert(`请输入${requiredCount}个有效成绩（当前输入了${attempts.length}个有效时间）`)
@@ -169,13 +172,15 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     const selectedRegs = registrations.filter(reg => selectedUserIds.has(reg.user_id))
     const registrationIds = selectedRegs.map(reg => reg.id)
 
+    // 删除旧成绩
     await supabase.from('results').delete().in('registration_id', registrationIds)
 
+    // 插入新成绩，原始字符串数组存储
     const inserts = registrationIds.map(regId => ({
       registration_id: regId,
-      attempt_data: rawInputs,   // 存储原始字符串数组
+      attempt_data: rawInputs,
       calculation_rule: event.calculation_rule,
-      average,   // 存储秒数
+      average,
       best,
       group_id: groupId,
     }))
@@ -197,6 +202,13 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       })
     }
   }
+
+  const filteredRegistrations = registrations.filter(reg => {
+    const siteId = reg.profiles.site_id
+    const username = reg.profiles.username
+    const term = searchTerm.toLowerCase()
+    return siteId.toLowerCase().includes(term) || username.toLowerCase().includes(term)
+  })
 
   return (
     <div className="container py-8 max-w-4xl">
@@ -251,7 +263,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                           checked={selectedUserIds.has(reg.user_id)}
                           onChange={() => handleSelectUser(reg.user_id)}
                         />
-                       </td>
+                      </td>
                        <td>{reg.profiles.site_id}</td>
                        <td>{reg.profiles.username}</td>
                        <td>
@@ -260,8 +272,8 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                         ) : (
                           <span className="text-gray-500">未上传</span>
                         )}
-                      </td>
-                    </tr>
+                       </td>
+                     </tr>
                   ))}
                 </tbody>
               </table>
