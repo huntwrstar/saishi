@@ -57,9 +57,9 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
           <table className="table">
             <thead>
               <tr>
-                <th>报名序号</th>
-                <th>选手姓名</th>
-                <th>报名项目</th>
+                <th>NO.</th>
+                <th>选手</th>
+                <th>项目</th>
               </tr>
             </thead>
             <tbody>

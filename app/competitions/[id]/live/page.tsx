@@ -214,7 +214,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                   <thead>
                     <tr>
                       <th>排名</th>
-                      <th>报名序号</th>
+                      <th>NO.</th>
                       <th>选手</th>
                       <th>平均</th>
                       <th>最好</th>

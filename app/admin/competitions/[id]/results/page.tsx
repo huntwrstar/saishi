@@ -246,7 +246,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                 <thead>
                   <tr>
                     <th>选择</th>
-                    <th>报名序号</th>
+                    <th>网站ID</th>
                     <th>选手姓名</th>
                     <th>状态</th>
                   </tr>

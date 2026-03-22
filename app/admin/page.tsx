@@ -15,19 +15,29 @@ export default function AdminPage() {
     })
   }, [])
 
-  if (loading) return <div>加载中...</div>
+  if (loading) return <div className="text-center py-8">加载中...</div>
 
   if (!isAdmin) {
-    return <div>您没有权限访问此页面</div>
+    return <div className="text-center text-red-500 py-8">您没有权限访问此页面</div>
   }
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>后台管理</h1>
-      <ul>
-        <li><Link href="/admin/competitions">管理赛事</Link></li>
-        <li><Link href="/admin/competitions/new">创建新赛事</Link></li>
-      </ul>
+    <div className="container py-8">
+      <div className="card p-6">
+        <h1 className="text-xl font-bold mb-6">后台管理</h1>
+        <ul className="space-y-3">
+          <li>
+            <Link href="/admin/competitions" className="btn btn-primary">
+              管理赛事
+            </Link>
+          </li>
+          <li>
+            <Link href="/admin/competitions/new" className="btn btn-primary">
+              创建新赛事
+            </Link>
+          </li>
+        </ul>
+      </div>
     </div>
   )
 }
