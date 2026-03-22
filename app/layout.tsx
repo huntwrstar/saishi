@@ -27,19 +27,21 @@ export default async function RootLayout({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              flexWrap: 'nowrap',          // 新增：强制不换行
+              gap: '0.5rem',               // 新增：减小间隙
             }}
           >
             <Link
               href="/"
               style={{
-                fontSize: '1.25rem',
+                fontSize: '1rem',          // 修改：从 1.25rem 缩小到 1rem
                 fontWeight: 'bold',
                 color: '#1f2937',
                 textDecoration: 'none',
-                letterSpacing: '-0.025em',
+                whiteSpace: 'nowrap',      // 新增：标题不换行
               }}
             >
-              鹅城魔方赛事网
+              赛事平台
             </Link>
             <UserMenu />
           </div>

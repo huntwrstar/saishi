@@ -202,3 +202,20 @@ body {
 /* 状态 */
 .status-registered { color: var(--secondary); }
 .status-withdrawn { color: #ef4444; }
+@media (max-width: 640px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .card {
+    border-radius: 0.5rem;
+  }
+  .btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  .table th, .table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}
