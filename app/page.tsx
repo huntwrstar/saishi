@@ -1,12 +1,14 @@
 import { supabaseServer } from '@/lib/supabase/server'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function Home() {
   const { data: competitions } = await supabaseServer
     .from('competitions')
     .select('*')
     .order('datetime', { ascending: false })
-    console.log('赛事数据:', competitions?.map(c => ({ id: c.id, name: c.name })));
 
   return (
     <div className="container py-8">
@@ -25,18 +27,12 @@ export default async function Home() {
                 {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleString()}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link href={`/competitions/${comp.id}`} className="btn btn-primary">
-                  查看详情
-                </Link>
+                <Link href={`/competitions/${comp.id}`} className="btn btn-primary">查看详情</Link>
                 {new Date() > new Date(comp.datetime) && !comp.is_finished && (
-                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">
-                    成绩直播
-                  </Link>
+                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">成绩直播</Link>
                 )}
                 {comp.is_finished && (
-                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">
-                    赛果
-                  </Link>
+                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">赛果</Link>
                 )}
               </div>
             </div>
