@@ -4,6 +4,17 @@ import { useEffect, useState } from 'react'
 import * as React from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
+// 将时间字符串转换为秒数
+const parseTimeToSeconds = (timeStr: string): number => {
+  const trimmed = timeStr.trim()
+  if (trimmed === '') return NaN
+  const match = trimmed.match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/)
+  if (!match) return parseFloat(trimmed)
+  const minutes = match[1] ? parseInt(match[1]) : 0
+  const seconds = parseFloat(match[2])
+  return minutes * 60 + seconds
+}
+
 export default function UploadResults({ params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = React.use(params)
   const [events, setEvents] = useState<any[]>([])
@@ -14,7 +25,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
   const [saving, setSaving] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<Record<number, boolean>>({})
   const [groupDataMap, setGroupDataMap] = useState<Map<string, { attemptData: string[]; average: number; best: number; calculation_rule: string }>>(new Map())
-  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     supabase
@@ -41,7 +51,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       setRegistrations(regs || [])
       setSelectedUserIds(new Set())
       setGroupResults({})
-      setSearchTerm('')
 
       if (!regs || regs.length === 0) return
 
@@ -56,6 +65,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       setUploadStatus(statusMap)
 
       const groupMap = new Map<string, { attemptData: string[]; average: number; best: number; calculation_rule: string }>()
+      // 按 group_id 分组
       const groupResultsMap = new Map<string, any[]>()
       results?.forEach(r => {
         if (r.group_id) {
@@ -74,6 +84,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
           calculation_rule: first.calculation_rule,
         })
       }
+      // 无 group_id 的个人成绩
       results?.forEach(r => {
         if (!r.group_id) {
           const reg = regs.find(reg => reg.id === r.registration_id)
@@ -136,9 +147,10 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     if (!event) return
     const requiredCount = event.calculation_rule === 'avg_of_3' ? 3 : 5
     const rawInputs = groupResults[activeGroupId] || []
-    const attempts = rawInputs.map(v => parseFloat(v)).filter(v => !isNaN(v))
+    // 转换为秒数数组
+    const attempts = rawInputs.map(s => parseTimeToSeconds(s)).filter(v => !isNaN(v))
     if (attempts.length !== requiredCount) {
-      alert(`请输入${requiredCount}个有效成绩（当前输入了${attempts.length}个有效数字）`)
+      alert(`请输入${requiredCount}个有效成绩（当前输入了${attempts.length}个有效时间）`)
       return
     }
 
@@ -161,9 +173,9 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
 
     const inserts = registrationIds.map(regId => ({
       registration_id: regId,
-      attempt_data: rawInputs,
+      attempt_data: rawInputs,   // 存储原始字符串数组
       calculation_rule: event.calculation_rule,
-      average,
+      average,   // 存储秒数
       best,
       group_id: groupId,
     }))
@@ -185,13 +197,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       })
     }
   }
-
-  const filteredRegistrations = registrations.filter(reg => {
-    const siteId = reg.profiles.site_id
-    const username = reg.profiles.username
-    const term = searchTerm.toLowerCase()
-    return siteId.toLowerCase().includes(term) || username.toLowerCase().includes(term)
-  })
 
   return (
     <div className="container py-8 max-w-4xl">
@@ -236,8 +241,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                     <th>报名序号</th>
                     <th>选手姓名</th>
                     <th>状态</th>
-                  </tr>
-                </thead>
+                  </thead>
                 <tbody>
                   {filteredRegistrations.map(reg => (
                     <tr key={reg.user_id}>
@@ -247,10 +251,10 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                           checked={selectedUserIds.has(reg.user_id)}
                           onChange={() => handleSelectUser(reg.user_id)}
                         />
-                      </td>
-                      <td>{reg.profiles.site_id}</td>
-                      <td>{reg.profiles.username}</td>
-                      <td>
+                       </td>
+                       <td>{reg.profiles.site_id}</td>
+                       <td>{reg.profiles.username}</td>
+                       <td>
                         {uploadStatus[reg.id] ? (
                           <span className="text-green-600">已上传</span>
                         ) : (
