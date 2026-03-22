@@ -63,7 +63,7 @@ export default function NewCompetition() {
     e.preventDefault()
     setLoading(true)
 
-    const toISO = (dateStr: string) => dateStr ? new Date(dateStr).toISOString() : null
+    const toISO = (dateStr: string) => dateStr || null;
 
     // 插入赛事
     const { data: competition, error: compError } = await supabase

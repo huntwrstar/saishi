@@ -19,9 +19,9 @@ export default async function Home() {
                 <p>日期：{new Date(comp.datetime).toLocaleDateString()}</p>
                 <p>地点：{comp.location}</p>
                 {comp.registration_start && (
-                  <p>报名：{new Date(comp.registration_start).toLocaleDateString()} - {comp.registration_end ? new Date(comp.registration_end).toLocaleDateString() : '无结束'}</p>
+                  <p>报名：{new Date(comp.registration_start).toLocaleString()} - {comp.registration_end ? new Date(comp.registration_end).toLocaleString() : '无结束'}</p>
                 )}
-                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleDateString()}</p>}
+                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleString()}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link href={`/competitions/${comp.id}`} className="btn btn-primary">

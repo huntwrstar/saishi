@@ -185,13 +185,14 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       <div className="card p-6 mb-8">
         <h1 className="text-xl font-bold mb-4">{competition.name}</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 mb-4">
-          <p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
-          <p>地点：{competition.location}</p>
-          <p>基础报名费：¥{competition.base_fee}</p>
-          {competition.registration_start && (
-            <p>报名时间：{new Date(competition.registration_start).toLocaleDateString()} - {competition.registration_end ? new Date(competition.registration_end).toLocaleDateString() : '无结束'}</p>
-          )}
-          <p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleDateString() : '无'}</p>
+// 在赛事信息卡片中
+<p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
+<p>地点：{competition.location}</p>
+<p>基础报名费：¥{competition.base_fee}</p>
+{competition.registration_start && (
+  <p>报名时间：{new Date(competition.registration_start).toLocaleString()} - {competition.registration_end ? new Date(competition.registration_end).toLocaleString() : '无结束'}</p>
+)}
+<p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleString() : '无'}</p>
         </div>
         <details className="mb-4">
           <summary className="text-primary cursor-pointer">关于比赛</summary>

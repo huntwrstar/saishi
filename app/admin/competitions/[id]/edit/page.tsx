@@ -47,7 +47,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const toISO = (dateStr: string) => dateStr ? new Date(dateStr).toISOString() : null
+    const toLocal = (dateStr: string) => dateStr || null;
     const { error } = await supabase
       .from('competitions')
       .update({
