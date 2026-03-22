@@ -8,7 +8,6 @@ import { v4 as uuidv4 } from 'uuid'
 const parseTimeToSeconds = (timeStr: string): number => {
   const trimmed = timeStr.trim()
   if (trimmed === '') return NaN
-  // 格式: mm:ss.ms 或 ss.ms
   const match = trimmed.match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/)
   if (!match) return parseFloat(trimmed)
   const minutes = match[1] ? parseInt(match[1], 10) : 0
@@ -150,7 +149,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     if (!event) return
     const requiredCount = event.calculation_rule === 'avg_of_3' ? 3 : 5
     const rawInputs = groupResults[activeGroupId] || []
-    // 将原始字符串转为秒数数组，用于计算
     const attempts = rawInputs.map(s => parseTimeToSeconds(s)).filter(v => !isNaN(v))
     if (attempts.length !== requiredCount) {
       alert(`请输入${requiredCount}个有效成绩（当前输入了${attempts.length}个有效时间）`)
@@ -172,10 +170,8 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     const selectedRegs = registrations.filter(reg => selectedUserIds.has(reg.user_id))
     const registrationIds = selectedRegs.map(reg => reg.id)
 
-    // 删除旧成绩
     await supabase.from('results').delete().in('registration_id', registrationIds)
 
-    // 插入新成绩，原始字符串数组存储
     const inserts = registrationIds.map(regId => ({
       registration_id: regId,
       attempt_data: rawInputs,
@@ -253,7 +249,8 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                     <th>报名序号</th>
                     <th>选手姓名</th>
                     <th>状态</th>
-                  </thead>
+                  </tr>
+                </thead>
                 <tbody>
                   {filteredRegistrations.map(reg => (
                     <tr key={reg.user_id}>
@@ -264,16 +261,16 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                           onChange={() => handleSelectUser(reg.user_id)}
                         />
                       </td>
-                       <td>{reg.profiles.site_id}</td>
-                       <td>{reg.profiles.username}</td>
-                       <td>
+                      <td>{reg.profiles.site_id}</td>
+                      <td>{reg.profiles.username}</td>
+                      <td>
                         {uploadStatus[reg.id] ? (
                           <span className="text-green-600">已上传</span>
                         ) : (
                           <span className="text-gray-500">未上传</span>
                         )}
-                       </td>
-                     </tr>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
