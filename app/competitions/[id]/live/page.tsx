@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { useEffect, useRef, useState } from 'react'
 
+// 时间格式化函数（处理 null）
 const formatTime = (seconds: number | null): string => {
   if (seconds === null || isNaN(seconds)) return '-'
   if (seconds < 60) return seconds.toFixed(2)
@@ -13,11 +14,26 @@ const formatTime = (seconds: number | null): string => {
   return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.padStart(5, '0')}`
 }
 
+interface GroupUser {
+  user_id: string
+  username: string
+  site_id: string
+  order: number
+}
+
+interface Group {
+  users: GroupUser[]
+  average: number | null
+  best: number | null
+  attemptData: string[]
+  rank?: number | null
+}
+
 export default function LivePage({ params }: { params: Promise<{ id: string }> }) {
   const [competitionId, setCompetitionId] = useState<string | null>(null)
   const [competition, setCompetition] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
-  const [rankingsMap, setRankingsMap] = useState<Record<number, any[]>>({})
+  const [rankingsMap, setRankingsMap] = useState<Record<number, Group[]>>({})
   const [loading, setLoading] = useState(true)
   const eventRefs = useRef<Record<number, HTMLDivElement | null>>({})
 
@@ -33,6 +49,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!competitionId) return
 
     const fetchData = async () => {
+      // 1. 获取赛事基本信息
       const { data: comp } = await supabase
         .from('competitions')
         .select('*')
@@ -40,6 +57,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .single()
       setCompetition(comp)
 
+      // 2. 获取项目列表
       const { data: evts } = await supabase
         .from('events')
         .select('*')
@@ -50,9 +68,16 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
+      // 3. 获取所有报名记录（不含 profiles 信息，避免类型问题）
       const { data: registrations } = await supabase
         .from('registrations')
-        .select('id, user_id, event_id, status, created_at')
+        .select(`
+          id,
+          user_id,
+          event_id,
+          status,
+          created_at
+        `)
         .eq('competition_id', competitionId)
         .eq('status', 'registered')
         .order('created_at', { ascending: true })
@@ -63,6 +88,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
+      // 4. 获取选手信息（单独查询 profiles）
       const userIds = [...new Set(registrations.map(r => r.user_id))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -70,19 +96,22 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .in('id', userIds)
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
-      const userOrder = new Map()
+      // 5. 计算每个用户的报名序号
+      const userOrder = new Map<string, number>()
       for (const reg of registrations) {
         if (!userOrder.has(reg.user_id)) {
           userOrder.set(reg.user_id, userOrder.size + 1)
         }
       }
 
+      // 6. 获取所有成绩
       const regIds = registrations.map(r => r.id)
       const { data: results } = await supabase
         .from('results')
         .select('*')
         .in('registration_id', regIds)
 
+      // 成绩按 registration_id 映射，保留最新的一条
       const resultsByReg = new Map()
       results?.forEach(r => {
         const existing = resultsByReg.get(r.registration_id)
@@ -91,11 +120,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         }
       })
 
-      const projectRankings: Record<number, any[]> = {}
+      // 7. 按项目构建成绩组
+      const projectRankings: Record<number, Group[]> = {}
       for (const event of evts) {
         const eventRegs = registrations.filter(r => r.event_id === event.id)
-        const groupMap = new Map<string, any>()
 
+        const groupMap = new Map<string, Group>()
         for (const reg of eventRegs) {
           const result = resultsByReg.get(reg.id)
           const groupId = result?.group_id || `single-${reg.id}`
@@ -107,27 +137,29 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
               attemptData: result?.attempt_data ?? [],
             })
           }
-          const group = groupMap.get(groupId)
+          const group = groupMap.get(groupId)!
           const profile = profileMap.get(reg.user_id)
-          if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
+          if (profile && !group.users.some(u => u.user_id === reg.user_id)) {
             group.users.push({
               user_id: reg.user_id,
               username: profile.username,
               site_id: profile.site_id,
-              order: userOrder.get(reg.user_id),
+              order: userOrder.get(reg.user_id)!,
             })
           }
         }
 
+        // 转换为数组并排序
         let groups = Array.from(groupMap.values())
         groups.sort((a, b) => {
           if (a.average === null && b.average === null) return 0
           if (a.average === null) return 1
           if (b.average === null) return -1
-          if (a.average === b.average) return a.best - b.best
-          return a.average - b.average
+          if (a.average === b.average) return (a.best || 0) - (b.best || 0)
+          return (a.average || 0) - (b.average || 0)
         })
 
+        // 添加排名
         let rank = 1
         const ranked = groups.map(item => ({
           ...item,
@@ -191,11 +223,10 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                   </thead>
                   <tbody>
                     {rankings.map((group, idx) => {
-                      const orderSet = new Set(group.users.map((u: any) => u.order))
-                      const orderNumbers = Array.from(orderSet)
-                        .sort((a: number, b: number) => a - b)
-                        .join(',')
-                      const usernames = group.users.map((u: any) => u.username).join(', ')
+                      // 报名序号去重排序
+                      const orderSet = new Set(group.users.map(u => u.order))
+                      const orderNumbers = Array.from(orderSet).sort((a, b) => a - b).join(',')
+                      const usernames = group.users.map(u => u.username).join(', ')
                       return (
                         <tr key={idx}>
                           <td>{group.rank ? group.rank : '-'}</td>
