@@ -52,12 +52,12 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       .from('competitions')
       .update({
         name: form.name,
-        datetime: toISO(form.datetime),
+        datetime: toLocal(form.datetime),
         location: form.location,
         description: form.description,
-        withdrawal_deadline: toISO(form.withdrawal_deadline),
-        registration_start: toISO(form.registration_start),
-        registration_end: toISO(form.registration_end),
+        withdrawal_deadline: toLocal(form.withdrawal_deadline),
+        registration_start: toLocal(form.registration_start),
+        registration_end: toLocal(form.registration_end),
         base_fee: form.base_fee,
       })
       .eq('id', competitionId)

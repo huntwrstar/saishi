@@ -63,19 +63,19 @@ export default function NewCompetition() {
     e.preventDefault()
     setLoading(true)
 
-    const toISO = (dateStr: string) => dateStr || null;
+    const toLocal = (dateStr: string) => dateStr || null;
 
     // 插入赛事
     const { data: competition, error: compError } = await supabase
       .from('competitions')
       .insert({
         name: form.name,
-        datetime: toISO(form.datetime),
+        datetime: toLocal(form.datetime),
         location: form.location,
         description: form.description,
-        withdrawal_deadline: toISO(form.withdrawal_deadline),
-        registration_start: toISO(form.registration_start),
-        registration_end: toISO(form.registration_end),
+        withdrawal_deadline: toLocal(form.withdrawal_deadline),
+        registration_start: toLocal(form.registration_start),
+        registration_end: toLocal(form.registration_end),
         base_fee: form.base_fee,
       })
       .select()
