@@ -1,15 +1,30 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+import 'react-quill/dist/quill.snow.css'
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 
 const FIXED_EVENTS = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
 ]
+
+// 完整工具栏配置
+const modules = {
+  toolbar: [
+    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+    [{ 'align': [] }],
+    ['blockquote', 'code-block', 'link'],
+    ['clean'], // 清除格式
+    ['hr']     // 分割线
+  ],
+}
 
 export default function NewCompetition() {
   const router = useRouter()
@@ -26,28 +41,6 @@ export default function NewCompetition() {
   const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number }[]>([])
   const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean }[]>([])
   const [loading, setLoading] = useState(false)
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
-    ],
-    content: form.description,
-    onUpdate: ({ editor }) => {
-      setForm(prev => ({ ...prev, description: editor.getHTML() }))
-    },
-    editorProps: {
-      attributes: {
-        class: 'min-h-[200px] p-2 border border-gray-300 rounded bg-white focus:outline-none',
-      },
-    },
-  })
-
-  useEffect(() => {
-    if (editor) {
-      console.log('✅ 编辑器已初始化')
-    }
-  }, [editor])
 
   const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
     setSelectedFixedEvents(prev => {
@@ -150,7 +143,13 @@ export default function NewCompetition() {
         </div>
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
-          <EditorContent editor={editor} />
+          <ReactQuill
+            theme="snow"
+            value={form.description}
+            onChange={(value) => setForm({ ...form, description: value })}
+            modules={modules}
+            className="bg-white"
+          />
         </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>

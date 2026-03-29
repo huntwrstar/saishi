@@ -236,19 +236,9 @@ body {
 }
 
 
-
-/* TipTap 编辑器基础样式 */
-.ProseMirror {
-  outline: none;
-  min-height: 200px;
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  background-color: white;
-}
-.ProseMirror p {
-  margin: 0 0 0.5em 0;
-}
-.ProseMirror ul, .ProseMirror ol {
+.quill-content ul, .quill-content ol {
   padding-left: 1.5rem;
+}
+.quill-content hr {
+  margin: 1rem 0;
 }

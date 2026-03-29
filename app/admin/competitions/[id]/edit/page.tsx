@@ -4,9 +4,23 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import * as React from 'react'
 import Link from 'next/link'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
+import dynamic from 'next/dynamic'
+import 'react-quill/dist/quill.snow.css'
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
+
+const modules = {
+  toolbar: [
+    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+    [{ 'align': [] }],
+    ['blockquote', 'code-block', 'link'],
+    ['clean'],
+    ['hr']
+  ],
+}
 
 export default function EditCompetition({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -23,28 +37,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   })
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
-    ],
-    content: form.description,
-    onUpdate: ({ editor }) => {
-      setForm(prev => ({ ...prev, description: editor.getHTML() }))
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-2 border border-gray-300 rounded',
-      },
-    },
-  })
-
-  useEffect(() => {
-    if (editor && form.description) {
-      editor.commands.setContent(form.description)
-    }
-  }, [editor, form.description])
 
   useEffect(() => {
     supabase
@@ -115,7 +107,13 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         </div>
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
-          <EditorContent editor={editor} />
+          <ReactQuill
+            theme="snow"
+            value={form.description}
+            onChange={(value) => setForm({ ...form, description: value })}
+            modules={modules}
+            className="bg-white"
+          />
         </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
