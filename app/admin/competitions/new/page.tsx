@@ -1,7 +1,7 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -30,9 +30,7 @@ export default function NewCompetition() {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({
-        placeholder: '输入比赛介绍，支持富文本格式...',
-      }),
+      Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
     ],
     content: form.description,
     onUpdate: ({ editor }) => {
@@ -40,10 +38,16 @@ export default function NewCompetition() {
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-2 border border-gray-300 rounded',
+        class: 'min-h-[200px] p-2 border border-gray-300 rounded bg-white focus:outline-none',
       },
     },
   })
+
+  useEffect(() => {
+    if (editor) {
+      console.log('✅ 编辑器已初始化')
+    }
+  }, [editor])
 
   const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
     setSelectedFixedEvents(prev => {
@@ -144,12 +148,10 @@ export default function NewCompetition() {
           <label className="form-label">地点</label>
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
-<div className="form-group">
-  <label className="form-label">介绍（关于比赛）</label>
-  <div className="editor-wrapper">
-    <EditorContent editor={editor} />
-  </div>
-</div>
+        <div className="form-group">
+          <label className="form-label">介绍（关于比赛）</label>
+          <EditorContent editor={editor} />
+        </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
           <input type="number" step="0.01" className="form-input" value={form.base_fee} onChange={e => setForm({ ...form, base_fee: parseFloat(e.target.value) || 0 })} />
