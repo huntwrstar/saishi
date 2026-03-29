@@ -235,13 +235,15 @@ body {
   white-space: nowrap;
 }
 
-/* 移动端 Quill 编辑器样式 */
-@media (max-width: 640px) {
-  .ql-toolbar.ql-snow {
-    padding: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .ql-toolbar button {
-    margin: 0.2rem;
-  }
+
+
+/* TipTap 编辑器样式 */
+.ProseMirror {
+  outline: none;
+}
+.ProseMirror p {
+  margin: 0 0 0.5em 0;
+}
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
 }

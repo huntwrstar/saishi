@@ -2,10 +2,9 @@
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import dynamic from 'next/dynamic'
-import 'react-quill/dist/quill.snow.css'
-
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
 
 const FIXED_EVENTS = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
@@ -27,6 +26,24 @@ export default function NewCompetition() {
   const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number }[]>([])
   const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean }[]>([])
   const [loading, setLoading] = useState(false)
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: '输入比赛介绍，支持富文本格式...',
+      }),
+    ],
+    content: form.description,
+    onUpdate: ({ editor }) => {
+      setForm(prev => ({ ...prev, description: editor.getHTML() }))
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-2 border border-gray-300 rounded',
+      },
+    },
+  })
 
   const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
     setSelectedFixedEvents(prev => {
@@ -111,14 +128,6 @@ export default function NewCompetition() {
     setLoading(false)
   }
 
-  const modules = {
-    toolbar: [
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['link', 'clean'],
-    ],
-  }
-
   return (
     <div className="container py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-6">新建赛事</h1>
@@ -137,14 +146,7 @@ export default function NewCompetition() {
         </div>
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
-          <ReactQuill
-            theme="snow"
-            value={form.description}
-            onChange={(value) => setForm({ ...form, description: value })}
-            modules={modules}
-            className="bg-white"
-            placeholder="输入比赛介绍，支持富文本格式..."
-          />
+          <EditorContent editor={editor} />
         </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
@@ -163,7 +165,7 @@ export default function NewCompetition() {
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
-        {/* 固定项目（支持额外收费） */}
+        {/* 固定项目 */}
         <div className="form-group">
           <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
