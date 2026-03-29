@@ -2,6 +2,13 @@
 import { supabase } from '@/lib/supabase/client'
 import { useEffect, useRef, useState } from 'react'
 
+const ROUNDS = [
+  { value: 1, label: '初赛' },
+  { value: 2, label: '复赛' },
+  { value: 3, label: '半决赛' },
+  { value: 4, label: '决赛' },
+]
+
 // 时间格式化函数（处理 null）
 const formatTime = (seconds: number | null): string => {
   if (seconds === null || isNaN(seconds)) return '-'
@@ -14,27 +21,14 @@ const formatTime = (seconds: number | null): string => {
   return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.padStart(5, '0')}`
 }
 
-interface GroupUser {
-  user_id: string
-  username: string
-  site_id: string
-  order: number
-}
-
-interface Group {
-  users: GroupUser[]
-  average: number | null
-  best: number | null
-  attemptData: string[]
-  rank?: number | null
-}
-
 export default function LivePage({ params }: { params: Promise<{ id: string }> }) {
   const [competitionId, setCompetitionId] = useState<string | null>(null)
   const [competition, setCompetition] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
-  const [rankingsMap, setRankingsMap] = useState<Record<number, Group[]>>({})
+  const [rankingsMap, setRankingsMap] = useState<Record<number, any[]>>({})
   const [loading, setLoading] = useState(true)
+  const [selectedRound, setSelectedRound] = useState<number>(1)
+  const [availableRounds, setAvailableRounds] = useState<number[]>([])
   const eventRefs = useRef<Record<number, HTMLDivElement | null>>({})
 
   useEffect(() => {
@@ -49,7 +43,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!competitionId) return
 
     const fetchData = async () => {
-      // 1. 获取赛事基本信息
+      // 获取赛事信息
       const { data: comp } = await supabase
         .from('competitions')
         .select('*')
@@ -57,7 +51,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .single()
       setCompetition(comp)
 
-      // 2. 获取项目列表
+      // 获取项目列表
       const { data: evts } = await supabase
         .from('events')
         .select('*')
@@ -68,7 +62,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 3. 获取所有报名记录（不含 profiles 信息，避免类型问题）
+      // 获取所有报名记录（按报名时间排序）
       const { data: registrations } = await supabase
         .from('registrations')
         .select(`
@@ -88,7 +82,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 4. 获取选手信息（单独查询 profiles）
+      // 获取选手信息
       const userIds = [...new Set(registrations.map(r => r.user_id))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -96,22 +90,34 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .in('id', userIds)
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
-      // 5. 计算每个用户的报名序号
-      const userOrder = new Map<string, number>()
+      // 计算每个用户的报名序号
+      const userOrder = new Map()
       for (const reg of registrations) {
         if (!userOrder.has(reg.user_id)) {
           userOrder.set(reg.user_id, userOrder.size + 1)
         }
       }
 
-      // 6. 获取所有成绩
-      const regIds = registrations.map(r => r.id)
+      // 获取所有成绩（仅用于获取有哪些轮次）
+      const allRegIds = registrations.map(r => r.id)
+      const { data: allResults } = await supabase
+        .from('results')
+        .select('round')
+        .in('registration_id', allRegIds)
+      const roundsSet = new Set(allResults?.map(r => r.round) || [])
+      const rounds = Array.from(roundsSet).sort((a, b) => a - b)
+      setAvailableRounds(rounds)
+      if (rounds.length > 0 && !rounds.includes(selectedRound)) {
+        setSelectedRound(rounds[0])
+      }
+
+      // 获取当前轮次的成绩
       const { data: results } = await supabase
         .from('results')
         .select('*')
-        .in('registration_id', regIds)
+        .in('registration_id', allRegIds)
+        .eq('round', selectedRound)
 
-      // 成绩按 registration_id 映射，保留最新的一条
       const resultsByReg = new Map()
       results?.forEach(r => {
         const existing = resultsByReg.get(r.registration_id)
@@ -120,12 +126,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         }
       })
 
-      // 7. 按项目构建成绩组
-      const projectRankings: Record<number, Group[]> = {}
+      // 按项目构建成绩组
+      const projectRankings: Record<number, any[]> = {}
       for (const event of evts) {
         const eventRegs = registrations.filter(r => r.event_id === event.id)
 
-        const groupMap = new Map<string, Group>()
+        const groupMap = new Map<string, any>()
         for (const reg of eventRegs) {
           const result = resultsByReg.get(reg.id)
           const groupId = result?.group_id || `single-${reg.id}`
@@ -137,19 +143,18 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
               attemptData: result?.attempt_data ?? [],
             })
           }
-          const group = groupMap.get(groupId)!
+          const group = groupMap.get(groupId)
           const profile = profileMap.get(reg.user_id)
-          if (profile && !group.users.some(u => u.user_id === reg.user_id)) {
+          if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
             group.users.push({
               user_id: reg.user_id,
               username: profile.username,
               site_id: profile.site_id,
-              order: userOrder.get(reg.user_id)!,
+              order: userOrder.get(reg.user_id),
             })
           }
         }
 
-        // 转换为数组并排序
         let groups = Array.from(groupMap.values())
         groups.sort((a, b) => {
           if (a.average === null && b.average === null) return 0
@@ -159,7 +164,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           return (a.average || 0) - (b.average || 0)
         })
 
-        // 添加排名
         let rank = 1
         const ranked = groups.map(item => ({
           ...item,
@@ -173,7 +177,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
 
     fetchData()
-  }, [competitionId])
+  }, [competitionId, selectedRound])
 
   const scrollToEvent = (eventId: number) => {
     eventRefs.current[eventId]?.scrollIntoView({ behavior: 'smooth' })
@@ -192,6 +196,23 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     <div className="container py-8">
       <h1 className="text-xl font-bold mb-6">{title} - {competition.name}</h1>
 
+      {/* 轮次选择器 */}
+      {availableRounds.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-sm font-medium">轮次：</span>
+          <select
+            className="form-select w-auto"
+            value={selectedRound}
+            onChange={e => setSelectedRound(parseInt(e.target.value))}
+          >
+            {availableRounds.map(round => {
+              const roundLabel = ROUNDS.find(r => r.value === round)?.label || `第${round}轮`
+              return <option key={round} value={round}>{roundLabel}</option>
+            })}
+          </select>
+        </div>
+      )}
+
       <select className="form-select mb-6 w-auto" onChange={(e) => scrollToEvent(Number(e.target.value))}>
         <option value="">跳转到项目</option>
         {events.map(event => (
@@ -207,14 +228,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
               <h2 className="text-lg font-semibold">{event.name}</h2>
             </div>
             {rankings.length === 0 ? (
-              <div className="p-4 text-gray-500 text-center">暂无报名选手</div>
+              <div className="p-4 text-gray-500 text-center">暂无成绩</div>
             ) : (
               <div className="table-container">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>排名</th>
-                      <th>NO.</th>
+                      <th>报名序号</th>
                       <th>选手</th>
                       <th>平均</th>
                       <th>最好</th>
@@ -223,10 +244,9 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                   </thead>
                   <tbody>
                     {rankings.map((group, idx) => {
-                      // 报名序号去重排序
-                      const orderSet = new Set(group.users.map(u => u.order))
+                      const orderSet = new Set(group.users.map((u: any) => u.order))
                       const orderNumbers = Array.from(orderSet).sort((a, b) => a - b).join(',')
-                      const usernames = group.users.map(u => u.username).join(', ')
+                      const usernames = group.users.map((u: any) => u.username).join(', ')
                       return (
                         <tr key={idx}>
                           <td>{group.rank ? group.rank : '-'}</td>

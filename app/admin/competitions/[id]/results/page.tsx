@@ -4,7 +4,14 @@ import { useEffect, useState } from 'react'
 import * as React from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
-// 将时间字符串（如 "1:02.22" 或 "12.34"）转换为秒数
+const ROUNDS = [
+  { value: 1, label: '初赛' },
+  { value: 2, label: '复赛' },
+  { value: 3, label: '半决赛' },
+  { value: 4, label: '决赛' },
+]
+
+// 时间解析函数（支持 mm:ss.ms 或 ss.ms）
 const parseTimeToSeconds = (timeStr: string): number => {
   const trimmed = timeStr.trim()
   if (trimmed === '') return NaN
@@ -19,6 +26,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
   const { id: competitionId } = React.use(params)
   const [events, setEvents] = useState<any[]>([])
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null)
+  const [round, setRound] = useState<number>(1)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
   const [groupResults, setGroupResults] = useState<{ [groupId: string]: string[] }>({})
@@ -57,17 +65,19 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       if (!regs || regs.length === 0) return
 
       const regIds = regs.map(r => r.id)
+      // 获取当前轮次的成绩
       const { data: results } = await supabase
         .from('results')
         .select('*')
         .in('registration_id', regIds)
+        .eq('round', round)
 
       const statusMap: Record<number, boolean> = {}
       results?.forEach(r => { statusMap[r.registration_id] = true })
       setUploadStatus(statusMap)
 
+      // 构建 group 映射（按 user_id 组合或 group_id）
       const groupMap = new Map<string, { attemptData: string[]; average: number; best: number; calculation_rule: string }>()
-      // 按 group_id 分组
       const groupResultsMap = new Map<string, any[]>()
       results?.forEach(r => {
         if (r.group_id) {
@@ -86,7 +96,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
           calculation_rule: first.calculation_rule,
         })
       }
-      // 无 group_id 的个人成绩
       results?.forEach(r => {
         if (!r.group_id) {
           const reg = regs.find(reg => reg.id === r.registration_id)
@@ -104,7 +113,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       setGroupDataMap(groupMap)
     }
     fetchRegistrations()
-  }, [selectedEvent, competitionId])
+  }, [selectedEvent, competitionId, round])
 
   const currentEvent = events.find(e => e.id === selectedEvent)
   const attemptCount = currentEvent ? (currentEvent.calculation_rule === 'avg_of_3' ? 3 : 5) : 0
@@ -170,7 +179,12 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     const selectedRegs = registrations.filter(reg => selectedUserIds.has(reg.user_id))
     const registrationIds = selectedRegs.map(reg => reg.id)
 
-    await supabase.from('results').delete().in('registration_id', registrationIds)
+    // 删除该轮次的旧成绩
+    await supabase
+      .from('results')
+      .delete()
+      .in('registration_id', registrationIds)
+      .eq('round', round)
 
     const inserts = registrationIds.map(regId => ({
       registration_id: regId,
@@ -179,6 +193,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       average,
       best,
       group_id: groupId,
+      round,
     }))
 
     const { error } = await supabase.from('results').insert(inserts)
@@ -187,6 +202,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       alert('保存失败：' + error.message)
     } else {
       alert('保存成功')
+      // 更新本地状态
       const newStatus = { ...uploadStatus }
       registrationIds.forEach(id => { newStatus[id] = true })
       setUploadStatus(newStatus)
@@ -223,6 +239,21 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
         </select>
       </div>
 
+      {selectedEvent && (
+        <div className="form-group">
+          <label className="form-label">轮次：</label>
+          <select
+            className="form-select w-auto"
+            value={round}
+            onChange={e => setRound(parseInt(e.target.value))}
+          >
+            {ROUNDS.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {selectedEvent && registrations.length === 0 && (
         <div className="card p-6 text-center text-gray-500">暂无报名选手</div>
       )}
@@ -246,7 +277,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                 <thead>
                   <tr>
                     <th>选择</th>
-                    <th>网站ID</th>
+                    <th>报名序号</th>
                     <th>选手姓名</th>
                     <th>状态</th>
                   </tr>
