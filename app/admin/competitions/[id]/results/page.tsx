@@ -11,7 +11,6 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
-// 时间解析函数（支持 mm:ss.ms 或 ss.ms）
 const parseTimeToSeconds = (timeStr: string): number => {
   const trimmed = timeStr.trim()
   if (trimmed === '') return NaN
@@ -26,6 +25,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
   const { id: competitionId } = React.use(params)
   const [events, setEvents] = useState<any[]>([])
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null)
+  const [currentEventRounds, setCurrentEventRounds] = useState<number[]>([])
   const [round, setRound] = useState<number>(1)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
@@ -42,6 +42,18 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       .eq('competition_id', competitionId)
       .then(({ data }) => setEvents(data || []))
   }, [competitionId])
+
+  useEffect(() => {
+    if (!selectedEvent) return
+    const event = events.find(e => e.id === selectedEvent)
+    if (event) {
+      const rounds = event.rounds || [1]
+      setCurrentEventRounds(rounds)
+      if (!rounds.includes(round)) {
+        setRound(rounds[0])
+      }
+    }
+  }, [selectedEvent, events])
 
   useEffect(() => {
     if (!selectedEvent) return
@@ -65,7 +77,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       if (!regs || regs.length === 0) return
 
       const regIds = regs.map(r => r.id)
-      // 获取当前轮次的成绩
       const { data: results } = await supabase
         .from('results')
         .select('*')
@@ -76,7 +87,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       results?.forEach(r => { statusMap[r.registration_id] = true })
       setUploadStatus(statusMap)
 
-      // 构建 group 映射（按 user_id 组合或 group_id）
       const groupMap = new Map<string, { attemptData: string[]; average: number; best: number; calculation_rule: string }>()
       const groupResultsMap = new Map<string, any[]>()
       results?.forEach(r => {
@@ -179,7 +189,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     const selectedRegs = registrations.filter(reg => selectedUserIds.has(reg.user_id))
     const registrationIds = selectedRegs.map(reg => reg.id)
 
-    // 删除该轮次的旧成绩
     await supabase
       .from('results')
       .delete()
@@ -202,7 +211,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       alert('保存失败：' + error.message)
     } else {
       alert('保存成功')
-      // 更新本地状态
       const newStatus = { ...uploadStatus }
       registrationIds.forEach(id => { newStatus[id] = true })
       setUploadStatus(newStatus)
@@ -239,7 +247,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
         </select>
       </div>
 
-      {selectedEvent && (
+      {selectedEvent && currentEventRounds.length > 0 && (
         <div className="form-group">
           <label className="form-label">轮次：</label>
           <select
@@ -247,16 +255,15 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
             value={round}
             onChange={e => setRound(parseInt(e.target.value))}
           >
-            {ROUNDS.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
+            {currentEventRounds.map(r => {
+              const label = ROUNDS.find(ro => ro.value === r)?.label || `第${r}轮`
+              return <option key={r} value={r}>{label}</option>
+            })}
           </select>
         </div>
       )}
 
-      {selectedEvent && registrations.length === 0 && (
-        <div className="card p-6 text-center text-gray-500">暂无报名选手</div>
-      )}
+      {selectedEvent && registrations.length === 0 && <div className="card p-6 text-center text-gray-500">暂无报名选手</div>}
 
       {selectedEvent && registrations.length > 0 && (
         <>
@@ -285,22 +292,10 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                 <tbody>
                   {filteredRegistrations.map(reg => (
                     <tr key={reg.user_id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedUserIds.has(reg.user_id)}
-                          onChange={() => handleSelectUser(reg.user_id)}
-                        />
-                      </td>
+                      <td><input type="checkbox" checked={selectedUserIds.has(reg.user_id)} onChange={() => handleSelectUser(reg.user_id)} /></td>
                       <td>{reg.profiles.site_id}</td>
                       <td>{reg.profiles.username}</td>
-                      <td>
-                        {uploadStatus[reg.id] ? (
-                          <span className="text-green-600">已上传</span>
-                        ) : (
-                          <span className="text-gray-500">未上传</span>
-                        )}
-                      </td>
+                      <td>{uploadStatus[reg.id] ? <span className="text-green-600">已上传</span> : <span className="text-gray-500">未上传</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -316,7 +311,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
                   <input
                     key={i}
                     type="text"
-                    placeholder={`第${i + 1}次成绩`}
+                    placeholder={`第${i+1}次成绩`}
                     className="form-input w-28"
                     value={(groupResults[activeGroupId] || [])[i] || ''}
                     onChange={e => {

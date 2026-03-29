@@ -15,6 +15,13 @@ const FIXED_EVENTS = [
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
 ]
 
+const ROUNDS = [
+  { value: 1, label: '初赛' },
+  { value: 2, label: '复赛' },
+  { value: 3, label: '半决赛' },
+  { value: 4, label: '决赛' },
+]
+
 const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
 
 const ToolbarButton = ({ onClick, active, children, title }: any) => (
@@ -45,7 +52,7 @@ export default function NewCompetition() {
     base_fee: 0,
   })
   const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number }[]>([])
-  const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean }[]>([])
+  const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean; rounds: number[] }[]>([])
   const [loading, setLoading] = useState(false)
 
   const editor = useEditor({
@@ -98,12 +105,23 @@ export default function NewCompetition() {
   }
 
   const addCustomEvent = () => {
-    setCustomEvents([...customEvents, { name: '', rule: 'avg_of_3', extra_fee: 0, is_team: false }])
+    setCustomEvents([...customEvents, { name: '', rule: 'avg_of_3', extra_fee: 0, is_team: false, rounds: [1,2,3,4] }])
   }
 
   const updateCustomEvent = (index: number, field: string, value: any) => {
     const updated = [...customEvents]
     updated[index] = { ...updated[index], [field]: value }
+    setCustomEvents(updated)
+  }
+
+  const updateCustomEventRounds = (index: number, roundValue: number, checked: boolean) => {
+    const updated = [...customEvents]
+    const currentRounds = updated[index].rounds || []
+    if (checked) {
+      updated[index].rounds = [...currentRounds, roundValue].sort()
+    } else {
+      updated[index].rounds = currentRounds.filter(r => r !== roundValue)
+    }
     setCustomEvents(updated)
   }
 
@@ -143,6 +161,7 @@ export default function NewCompetition() {
       calculation_rule: 'avg_of_5_trim',
       extra_fee: event.extra_fee,
       is_team: false,
+      rounds: [1,2,3,4],
     }))
 
     const customEventsToInsert = customEvents.map(ce => ({
@@ -151,6 +170,7 @@ export default function NewCompetition() {
       calculation_rule: ce.rule,
       extra_fee: ce.extra_fee,
       is_team: ce.is_team,
+      rounds: ce.rounds,
     }))
 
     const { error: eventsError } = await supabase
@@ -195,48 +215,18 @@ export default function NewCompetition() {
                 <option value="">字号</option>
                 {FONT_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
               </select>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="加粗">
-                <strong>B</strong>
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="斜体">
-                <em>I</em>
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="删除线">
-                <s>S</s>
-              </ToolbarButton>
-              <input
-                type="color"
-                onInput={(e) => setColor((e.target as HTMLInputElement).value)}
-                className="w-7 h-7 p-0 border rounded cursor-pointer"
-                title="字体颜色"
-              />
-              <input
-                type="color"
-                onInput={(e) => setHighlight((e.target as HTMLInputElement).value)}
-                className="w-7 h-7 p-0 border rounded cursor-pointer"
-                title="背景颜色"
-              />
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="无序列表">
-                • 列表
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="有序列表">
-                1. 列表
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="分割线">
-                —
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="引用">
-                "
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="左对齐">
-                左
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="居中">
-                中
-              </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="右对齐">
-                右
-              </ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}><strong>B</strong></ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}><em>I</em></ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')}><s>S</s></ToolbarButton>
+              <input type="color" onInput={(e) => setColor((e.target as HTMLInputElement).value)} className="w-7 h-7 p-0 border rounded cursor-pointer" title="字体颜色" />
+              <input type="color" onInput={(e) => setHighlight((e.target as HTMLInputElement).value)} className="w-7 h-7 p-0 border rounded cursor-pointer" title="背景颜色" />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>• 列表</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>1. 列表</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()}>—</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>"</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })}>左</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })}>中</ToolbarButton>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })}>右</ToolbarButton>
             </div>
           )}
           <EditorContent editor={editor} />
@@ -304,6 +294,21 @@ export default function NewCompetition() {
                 <input type="checkbox" checked={ce.is_team} onChange={e => updateCustomEvent(idx, 'is_team', e.target.checked)} />
                 团队项目
               </label>
+              <div className="mb-2">
+                <label className="block text-sm font-medium mb-1">轮次（可多选）</label>
+                <div className="flex gap-3">
+                  {ROUNDS.map(r => (
+                    <label key={r.value} className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={ce.rounds?.includes(r.value) || false}
+                        onChange={(e) => updateCustomEventRounds(idx, r.value, e.target.checked)}
+                      />
+                      {r.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
               <button type="button" onClick={() => removeCustomEvent(idx)} className="btn btn-danger text-sm">删除</button>
             </div>
           ))}
