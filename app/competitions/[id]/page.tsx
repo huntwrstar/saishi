@@ -196,7 +196,7 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
         <details className="mb-4">
           <summary className="text-primary cursor-pointer">关于比赛</summary>
 <div
-  className="mt-2 text-gray-600 quill-content"
+  className="mt-2 text-gray-600"
   dangerouslySetInnerHTML={{ __html: competition.description || '' }}
 />
         </details>
