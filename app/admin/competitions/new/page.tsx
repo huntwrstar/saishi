@@ -6,17 +6,26 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TextAlign from '@tiptap/extension-text-align'
+import TextStyle from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import Highlight from '@tiptap/extension-highlight'
 
 const FIXED_EVENTS = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
 ]
 
+const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
+
 const ToolbarButton = ({ onClick, active, children, title }: any) => (
   <button
     type="button"
     onClick={onClick}
-    className={`px-2 py-1 rounded text-sm ${active ? 'bg-gray-300' : 'hover:bg-gray-100'}`}
+    className={`px-2 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+      active
+        ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-500'
+        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+    }`}
     title={title}
   >
     {children}
@@ -44,6 +53,9 @@ export default function NewCompetition() {
       StarterKit,
       Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      TextStyle,
+      Color,
+      Highlight,
     ],
     content: form.description,
     onUpdate: ({ editor }) => {
@@ -55,6 +67,21 @@ export default function NewCompetition() {
       },
     },
   })
+
+  const setFontSize = (size: string) => {
+    if (!editor) return
+    editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
+  }
+
+  const setColor = (color: string) => {
+    if (!editor) return
+    editor.chain().focus().setColor(color).run()
+  }
+
+  const setHighlight = (color: string) => {
+    if (!editor) return
+    editor.chain().focus().setHighlight({ color }).run()
+  }
 
   const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
     setSelectedFixedEvents(prev => {
@@ -143,7 +170,6 @@ export default function NewCompetition() {
     <div className="container py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-6">新建赛事</h1>
       <form onSubmit={handleSubmit} className="card p-6">
-        {/* 基本信息 */}
         <div className="form-group">
           <label className="form-label">赛事名称</label>
           <input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
@@ -157,39 +183,58 @@ export default function NewCompetition() {
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
 
-        {/* 富文本编辑器 */}
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
           {editor && (
-            <div className="border border-gray-200 rounded-t bg-gray-50 p-2 flex flex-wrap gap-1">
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>
+            <div className="border border-gray-200 rounded-t bg-gray-50 p-2 flex flex-wrap gap-1.5">
+              <select
+                className="px-2 py-1 rounded-md text-sm bg-white border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onChange={(e) => setFontSize(e.target.value)}
+                defaultValue=""
+              >
+                <option value="">字号</option>
+                {FONT_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+              </select>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="加粗">
                 <strong>B</strong>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="斜体">
                 <em>I</em>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="删除线">
                 <s>S</s>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>
+              <input
+                type="color"
+                onInput={(e) => setColor((e.target as HTMLInputElement).value)}
+                className="w-7 h-7 p-0 border rounded cursor-pointer"
+                title="字体颜色"
+              />
+              <input
+                type="color"
+                onInput={(e) => setHighlight((e.target as HTMLInputElement).value)}
+                className="w-7 h-7 p-0 border rounded cursor-pointer"
+                title="背景颜色"
+              />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="无序列表">
                 • 列表
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="有序列表">
                 1. 列表
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="分割线">
                 —
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="引用">
                 "
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="左对齐">
                 左
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="居中">
                 中
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="右对齐">
                 右
               </ToolbarButton>
             </div>
@@ -197,7 +242,6 @@ export default function NewCompetition() {
           <EditorContent editor={editor} />
         </div>
 
-        {/* 费用与时间 */}
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
           <input type="number" step="0.01" className="form-input" value={form.base_fee} onChange={e => setForm({ ...form, base_fee: parseFloat(e.target.value) || 0 })} />
@@ -215,7 +259,6 @@ export default function NewCompetition() {
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
-        {/* 固定项目 */}
         <div className="form-group">
           <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -246,47 +289,22 @@ export default function NewCompetition() {
           </div>
         </div>
 
-        {/* 自定义项目 */}
         <div className="form-group">
           <label className="form-label">自定义项目</label>
           <button type="button" onClick={addCustomEvent} className="btn btn-outline mb-2">添加自定义项目</button>
           {customEvents.map((ce, idx) => (
             <div key={idx} className="border border-gray-200 p-4 rounded mb-2">
-              <input
-                type="text"
-                placeholder="项目名称"
-                className="form-input mb-2"
-                value={ce.name}
-                onChange={e => updateCustomEvent(idx, 'name', e.target.value)}
-                required
-              />
-              <select
-                className="form-select mb-2"
-                value={ce.rule}
-                onChange={e => updateCustomEvent(idx, 'rule', e.target.value)}
-              >
+              <input type="text" placeholder="项目名称" className="form-input mb-2" value={ce.name} onChange={e => updateCustomEvent(idx, 'name', e.target.value)} required />
+              <select className="form-select mb-2" value={ce.rule} onChange={e => updateCustomEvent(idx, 'rule', e.target.value)}>
                 <option value="avg_of_3">三次取平均</option>
                 <option value="avg_of_5_trim">五次去最快最慢取平均</option>
               </select>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="额外收费"
-                className="form-input mb-2"
-                value={ce.extra_fee}
-                onChange={e => updateCustomEvent(idx, 'extra_fee', parseFloat(e.target.value) || 0)}
-              />
+              <input type="number" step="0.01" placeholder="额外收费" className="form-input mb-2" value={ce.extra_fee} onChange={e => updateCustomEvent(idx, 'extra_fee', parseFloat(e.target.value) || 0)} />
               <label className="flex items-center gap-1 mb-2">
-                <input
-                  type="checkbox"
-                  checked={ce.is_team}
-                  onChange={e => updateCustomEvent(idx, 'is_team', e.target.checked)}
-                />
+                <input type="checkbox" checked={ce.is_team} onChange={e => updateCustomEvent(idx, 'is_team', e.target.checked)} />
                 团队项目
               </label>
-              <button type="button" onClick={() => removeCustomEvent(idx)} className="btn btn-danger text-sm">
-                删除
-              </button>
+              <button type="button" onClick={() => removeCustomEvent(idx)} className="btn btn-danger text-sm">删除</button>
             </div>
           ))}
         </div>

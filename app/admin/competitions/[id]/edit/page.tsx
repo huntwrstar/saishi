@@ -8,12 +8,21 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TextAlign from '@tiptap/extension-text-align'
+import TextStyle from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import Highlight from '@tiptap/extension-highlight'
+
+const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
 
 const ToolbarButton = ({ onClick, active, children, title }: any) => (
   <button
     type="button"
     onClick={onClick}
-    className={`px-2 py-1 rounded text-sm ${active ? 'bg-gray-300' : 'hover:bg-gray-100'}`}
+    className={`px-2 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+      active
+        ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-500'
+        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+    }`}
     title={title}
   >
     {children}
@@ -43,6 +52,9 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       StarterKit,
       Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      TextStyle,
+      Color,
+      Highlight,
     ],
     content: form.description,
     onUpdate: ({ editor }) => {
@@ -60,6 +72,21 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       editor.commands.setContent(form.description)
     }
   }, [editor, form.description])
+
+  const setFontSize = (size: string) => {
+    if (!editor) return
+    editor.chain().focus().setMark('textStyle', { fontSize: size }).run()
+  }
+
+  const setColor = (color: string) => {
+    if (!editor) return
+    editor.chain().focus().setColor(color).run()
+  }
+
+  const setHighlight = (color: string) => {
+    if (!editor) return
+    editor.chain().focus().setHighlight({ color }).run()
+  }
 
   useEffect(() => {
     supabase
@@ -160,35 +187,55 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
           {editor && (
-            <div className="border border-gray-200 rounded-t bg-gray-50 p-2 flex flex-wrap gap-1">
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}>
+            <div className="border border-gray-200 rounded-t bg-gray-50 p-2 flex flex-wrap gap-1.5">
+              <select
+                className="px-2 py-1 rounded-md text-sm bg-white border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onChange={(e) => setFontSize(e.target.value)}
+                defaultValue=""
+              >
+                <option value="">字号</option>
+                {FONT_SIZES.map(size => <option key={size} value={size}>{size}</option>)}
+              </select>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="加粗">
                 <strong>B</strong>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="斜体">
                 <em>I</em>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="删除线">
                 <s>S</s>
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}>
+              <input
+                type="color"
+                onInput={(e) => setColor((e.target as HTMLInputElement).value)}
+                className="w-7 h-7 p-0 border rounded cursor-pointer"
+                title="字体颜色"
+              />
+              <input
+                type="color"
+                onInput={(e) => setHighlight((e.target as HTMLInputElement).value)}
+                className="w-7 h-7 p-0 border rounded cursor-pointer"
+                title="背景颜色"
+              />
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="无序列表">
                 • 列表
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="有序列表">
                 1. 列表
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+              <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="分割线">
                 —
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}>
+              <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="引用">
                 "
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="左对齐">
                 左
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="居中">
                 中
               </ToolbarButton>
-              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })}>
+              <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="右对齐">
                 右
               </ToolbarButton>
             </div>
@@ -213,7 +260,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
-        {/* 固定项目 */}
         <div className="form-group">
           <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -244,7 +290,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        {/* 自定义项目 */}
         <div className="form-group">
           <label className="form-label">自定义项目</label>
           <button type="button" onClick={addCustomEvent} className="btn btn-outline mb-2">添加自定义项目</button>

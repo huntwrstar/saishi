@@ -254,3 +254,18 @@ body {
 .ProseMirror hr {
   margin: 1rem 0;
 }
+
+/* 确保 ProseMirror 编辑器内列表缩进正常 */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+}
+.ProseMirror blockquote {
+  border-left: 3px solid #ccc;
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  color: #666;
+}
+.ProseMirror hr {
+  margin: 1rem 0;
+}
