@@ -12,17 +12,18 @@ const FIXED_EVENTS = [
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
 ]
 
-// 完整工具栏配置
+// 完整工具栏配置（包含所有要求的功能）
 const modules = {
   toolbar: [
-    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ 'color': [] }, { 'background': [] }],
-    [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-    [{ 'align': [] }],
-    ['blockquote', 'code-block', 'link'],
-    ['clean'], // 清除格式
-    ['hr']     // 分割线
+    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }], // 字体、字号
+    ['bold', 'italic', 'underline', 'strike'],                       // 加粗、斜体、下划线、删除线
+    [{ 'color': [] }, { 'background': [] }],                         // 字体颜色、背景颜色
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],                   // 数字编号、项目编号
+    [{ 'indent': '-1' }, { 'indent': '+1' }],                        // 减少缩进、增加缩进
+    [{ 'align': [] }],                                               // 对齐
+    ['blockquote', 'code-block', 'link'],                            // 引用、代码块、链接
+    ['clean'],                                                       // 清除格式（格式刷）
+    ['hr']                                                           // 分割线
   ],
 }
 
