@@ -144,10 +144,12 @@ export default function NewCompetition() {
           <label className="form-label">地点</label>
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
-        <div className="form-group">
-          <label className="form-label">介绍（关于比赛）</label>
-          <EditorContent editor={editor} />
-        </div>
+<div className="form-group">
+  <label className="form-label">介绍（关于比赛）</label>
+  <div className="editor-wrapper">
+    <EditorContent editor={editor} />
+  </div>
+</div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
           <input type="number" step="0.01" className="form-input" value={form.base_fee} onChange={e => setForm({ ...form, base_fee: parseFloat(e.target.value) || 0 })} />
