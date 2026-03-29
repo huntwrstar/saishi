@@ -247,3 +247,25 @@ body {
 .ProseMirror ul, .ProseMirror ol {
   padding-left: 1.5rem;
 }
+
+/* TipTap 编辑器基础样式 */
+.ProseMirror {
+  outline: none;
+  min-height: 200px;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background-color: white;
+}
+.ProseMirror p {
+  margin: 0 0 0.5em 0;
+}
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+}
+.ProseMirror strong {
+  font-weight: bold;
+}
+.ProseMirror em {
+  font-style: italic;
+}
