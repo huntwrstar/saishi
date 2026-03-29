@@ -2,8 +2,10 @@
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import ReactQuill from 'react-quill'
+import dynamic from 'next/dynamic'
 import 'react-quill/dist/quill.snow.css'
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 
 const FIXED_EVENTS = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',

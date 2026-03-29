@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import * as React from 'react'
 import Link from 'next/link'
-import ReactQuill from 'react-quill'
+import dynamic from 'next/dynamic'
 import 'react-quill/dist/quill.snow.css'
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 
 export default function EditCompetition({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
