@@ -2,12 +2,13 @@
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 
-// 固定项目列表，每个项目带默认收费 0
 const FIXED_EVENTS = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
-].map(name => ({ name, extra_fee: 0 }))
+]
 
 export default function NewCompetition() {
   const router = useRouter()
@@ -25,26 +26,20 @@ export default function NewCompetition() {
   const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean }[]>([])
   const [loading, setLoading] = useState(false)
 
-  // 处理固定项目选中/取消
   const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
     setSelectedFixedEvents(prev => {
       const exists = prev.some(e => e.name === event.name)
-      if (exists) {
-        return prev.filter(e => e.name !== event.name)
-      } else {
-        return [...prev, { ...event }]
-      }
+      if (exists) return prev.filter(e => e.name !== event.name)
+      return [...prev, { ...event }]
     })
   }
 
-  // 更新固定项目收费
   const updateFixedEventFee = (eventName: string, fee: number) => {
     setSelectedFixedEvents(prev =>
       prev.map(e => e.name === eventName ? { ...e, extra_fee: fee } : e)
     )
   }
 
-  // 自定义项目操作
   const addCustomEvent = () => {
     setCustomEvents([...customEvents, { name: '', rule: 'avg_of_3', extra_fee: 0, is_team: false }])
   }
@@ -63,9 +58,7 @@ export default function NewCompetition() {
     e.preventDefault()
     setLoading(true)
 
-    const toLocal = (dateStr: string) => dateStr || null;
-
-    // 插入赛事
+    const toLocal = (dateStr: string) => dateStr || null
     const { data: competition, error: compError } = await supabase
       .from('competitions')
       .insert({
@@ -87,16 +80,14 @@ export default function NewCompetition() {
       return
     }
 
-    // 固定项目插入数据
     const fixedEventsToInsert = selectedFixedEvents.map(event => ({
       competition_id: competition.id,
       name: event.name,
-      calculation_rule: 'avg_of_5_trim', // 默认规则
+      calculation_rule: 'avg_of_5_trim',
       extra_fee: event.extra_fee,
       is_team: false,
     }))
 
-    // 自定义项目插入数据
     const customEventsToInsert = customEvents.map(ce => ({
       competition_id: competition.id,
       name: ce.name,
@@ -118,11 +109,18 @@ export default function NewCompetition() {
     setLoading(false)
   }
 
+  const modules = {
+    toolbar: [
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link', 'clean'],
+    ],
+  }
+
   return (
     <div className="container py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-6">新建赛事</h1>
       <form onSubmit={handleSubmit} className="card p-6">
-        {/* 基本信息 */}
         <div className="form-group">
           <label className="form-label">赛事名称</label>
           <input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
@@ -137,7 +135,14 @@ export default function NewCompetition() {
         </div>
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
-          <textarea className="form-textarea" rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <ReactQuill
+            theme="snow"
+            value={form.description}
+            onChange={(value) => setForm({ ...form, description: value })}
+            modules={modules}
+            className="bg-white"
+            placeholder="输入比赛介绍，支持富文本格式..."
+          />
         </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
@@ -161,24 +166,24 @@ export default function NewCompetition() {
           <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {FIXED_EVENTS.map(event => {
-              const isSelected = selectedFixedEvents.some(e => e.name === event.name)
+              const isSelected = selectedFixedEvents.some(e => e.name === event)
               return (
-                <div key={event.name} className="flex items-center gap-2">
+                <div key={event} className="flex items-center gap-2">
                   <label className="flex items-center gap-1">
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => handleFixedEventToggle(event)}
+                      onChange={() => handleFixedEventToggle({ name: event, extra_fee: 0 })}
                     />
-                    {event.name}
+                    {event}
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="额外收费"
                     className="w-20 px-1 py-0.5 text-sm border rounded"
-                    value={selectedFixedEvents.find(e => e.name === event.name)?.extra_fee ?? 0}
-                    onChange={e => updateFixedEventFee(event.name, parseFloat(e.target.value) || 0)}
+                    value={selectedFixedEvents.find(e => e.name === event)?.extra_fee ?? 0}
+                    onChange={e => updateFixedEventFee(event, parseFloat(e.target.value) || 0)}
                     disabled={!isSelected}
                   />
                 </div>

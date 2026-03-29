@@ -195,7 +195,10 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
         </div>
         <details className="mb-4">
           <summary className="text-primary cursor-pointer">关于比赛</summary>
-          <p className="mt-2 text-gray-700">{competition.description}</p>
+          <div
+  className="mt-2 text-gray-600"
+  dangerouslySetInnerHTML={{ __html: competition.description || '' }}
+/>
         </details>
         <div className="flex gap-2">
           <Link href={`/competitions/${competitionId}/live`} className="btn btn-primary">成绩直播</Link>

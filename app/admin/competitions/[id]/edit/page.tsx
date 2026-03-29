@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import * as React from 'react'
 import Link from 'next/link'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 
 export default function EditCompetition({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -47,7 +49,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const toLocal = (dateStr: string) => dateStr || null;
+    const toLocal = (dateStr: string) => dateStr || null
     const { error } = await supabase
       .from('competitions')
       .update({
@@ -70,6 +72,14 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     }
   }
 
+  const modules = {
+    toolbar: [
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link', 'clean'],
+    ],
+  }
+
   if (fetching) return <div className="text-center py-8">加载中...</div>
 
   return (
@@ -90,7 +100,13 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         </div>
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
-          <textarea className="form-textarea" rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <ReactQuill
+            theme="snow"
+            value={form.description}
+            onChange={(value) => setForm({ ...form, description: value })}
+            modules={modules}
+            className="bg-white"
+          />
         </div>
         <div className="form-group">
           <label className="form-label">基础报名费 (元)</label>
