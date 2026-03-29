@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import TextAlign from '@tiptap/extension-text-align'
 
 const ToolbarButton = ({ onClick, active, children, title }: any) => (
   <button
@@ -41,6 +42,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder: '输入比赛介绍，支持富文本格式...' }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ],
     content: form.description,
     onUpdate: ({ editor }) => {
@@ -53,14 +55,12 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     },
   })
 
-  // 当从数据库加载的描述变化时，同步到编辑器
   useEffect(() => {
     if (editor && form.description) {
       editor.commands.setContent(form.description)
     }
   }, [editor, form.description])
 
-  // 加载赛事数据
   useEffect(() => {
     supabase
       .from('competitions')
@@ -79,8 +79,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
             registration_end: data.registration_end ? data.registration_end.slice(0, 16) : '',
             base_fee: data.base_fee || 0,
           })
-          // 加载固定项目（需要从 events 表查询，但本页面不直接管理项目，可忽略）
-          // 加载自定义项目同理，通过独立的管理页面处理。
         }
         setFetching(false)
       })
@@ -159,7 +157,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
 
-        {/* 富文本编辑器 */}
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
           {editor && (
