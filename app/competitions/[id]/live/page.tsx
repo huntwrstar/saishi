@@ -9,7 +9,7 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
-// 时间格式化函数（处理 null）
+// 时间格式化函数
 const formatTime = (seconds: number | null): string => {
   if (seconds === null || isNaN(seconds)) return '-'
   if (seconds < 60) return seconds.toFixed(2)
@@ -196,7 +196,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     <div className="container py-8">
       <h1 className="text-xl font-bold mb-6">{title} - {competition.name}</h1>
 
-      {/* 轮次选择器 */}
       {availableRounds.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
           <span className="text-sm font-medium">轮次：</span>
@@ -244,7 +243,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                   </thead>
                   <tbody>
                     {rankings.map((group, idx) => {
-                      const orderSet = new Set(group.users.map((u: any) => u.order))
+                      // 关键修复：显式指定 Set<number> 类型
+                      const orderSet = new Set<number>(group.users.map((u: any) => u.order))
                       const orderNumbers = Array.from(orderSet).sort((a, b) => a - b).join(',')
                       const usernames = group.users.map((u: any) => u.username).join(', ')
                       return (
