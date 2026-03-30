@@ -64,7 +64,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       Highlight.configure({ multicolor: true }),
     ],
     content: form.description,
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor}) => {
       setForm(prev => ({ ...prev, description: editor.getHTML() }))
     },
     editorProps: {

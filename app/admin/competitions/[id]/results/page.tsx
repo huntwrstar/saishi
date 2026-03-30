@@ -11,6 +11,12 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
+const STATUSES = [
+  { value: 'not_started', label: '未进行' },
+  { value: 'in_progress', label: '进行中' },
+  { value: 'finished', label: '已结束' },
+]
+
 const parseTimeToSeconds = (timeStr: string): number => {
   const trimmed = timeStr.trim()
   if (trimmed === '') return NaN
@@ -27,6 +33,7 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null)
   const [currentEventRounds, setCurrentEventRounds] = useState<number[]>([])
   const [round, setRound] = useState<number>(1)
+  const [roundStatus, setRoundStatus] = useState<string>('not_started')
   const [registrations, setRegistrations] = useState<any[]>([])
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
   const [groupResults, setGroupResults] = useState<{ [groupId: string]: string[] }>({})
@@ -52,6 +59,8 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       if (!rounds.includes(round)) {
         setRound(rounds[0])
       }
+      const statusMap = event.rounds_status || {}
+      setRoundStatus(statusMap[round] || 'not_started')
     }
   }, [selectedEvent, events])
 
@@ -206,6 +215,15 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
     }))
 
     const { error } = await supabase.from('results').insert(inserts)
+    if (!error) {
+      // 同时更新轮次状态
+      const currentStatus = event.rounds_status || {}
+      currentStatus[round] = roundStatus
+      await supabase
+        .from('events')
+        .update({ rounds_status: currentStatus })
+        .eq('id', selectedEvent)
+    }
     setSaving(false)
     if (error) {
       alert('保存失败：' + error.message)
@@ -221,6 +239,19 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
         return newMap
       })
     }
+  }
+
+  const updateStatusOnly = async () => {
+    const event = events.find(e => e.id === selectedEvent)
+    if (!event) return
+    const currentStatus = event.rounds_status || {}
+    currentStatus[round] = roundStatus
+    const { error } = await supabase
+      .from('events')
+      .update({ rounds_status: currentStatus })
+      .eq('id', selectedEvent)
+    if (error) alert('更新状态失败：' + error.message)
+    else alert('状态已更新')
   }
 
   const filteredRegistrations = registrations.filter(reg => {
@@ -248,18 +279,41 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
       </div>
 
       {selectedEvent && currentEventRounds.length > 0 && (
-        <div className="form-group">
-          <label className="form-label">轮次：</label>
-          <select
-            className="form-select w-auto"
-            value={round}
-            onChange={e => setRound(parseInt(e.target.value))}
-          >
-            {currentEventRounds.map(r => {
-              const label = ROUNDS.find(ro => ro.value === r)?.label || `第${r}轮`
-              return <option key={r} value={r}>{label}</option>
-            })}
-          </select>
+        <div className="flex flex-wrap gap-4 items-end mb-4">
+          <div className="flex-1">
+            <label className="form-label">轮次：</label>
+            <select
+              className="form-select w-full"
+              value={round}
+              onChange={e => setRound(parseInt(e.target.value))}
+            >
+              {currentEventRounds.map(r => {
+                const label = ROUNDS.find(ro => ro.value === r)?.label || `第${r}轮`
+                return <option key={r} value={r}>{label}</option>
+              })}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="form-label">状态：</label>
+            <select
+              className="form-select w-full"
+              value={roundStatus}
+              onChange={e => setRoundStatus(e.target.value)}
+            >
+              {STATUSES.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={updateStatusOnly}
+            >
+              更新状态（不修改成绩）
+            </button>
+          </div>
         </div>
       )}
 
