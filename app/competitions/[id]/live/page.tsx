@@ -42,6 +42,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!competitionId) return
 
     const fetchData = async () => {
+      console.log('[LivePage] 开始加载数据，比赛ID:', competitionId)
+
       // 获取赛事信息
       const { data: comp } = await supabase
         .from('competitions')
@@ -56,23 +58,30 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .select('*')
         .eq('competition_id', competitionId)
       setEvents(evts || [])
+      console.log('[LivePage] 项目列表:', evts?.map(e => ({ name: e.name, rounds: e.rounds })))
+
       if (!evts || evts.length === 0) {
         setLoading(false)
         return
       }
 
-      // 为每个项目初始化轮次选择（取第一个可用轮次）
+      // 为每个项目初始化轮次选择
       const initialRoundMap: Record<number, number> = {}
       const roundsMap: Record<number, number[]> = {}
       for (const event of evts) {
-        const rounds = event.rounds || [1]
+        // 确保 rounds 是数组，如果为空则默认全部四轮
+        let rounds = event.rounds
+        if (!rounds || !Array.isArray(rounds) || rounds.length === 0) {
+          rounds = [1, 2, 3, 4]
+        }
         roundsMap[event.id] = rounds
         initialRoundMap[event.id] = rounds[0]
+        console.log(`[LivePage] 项目 ${event.name} 可用轮次:`, rounds)
       }
       setAvailableRoundsMap(roundsMap)
       setSelectedRoundMap(initialRoundMap)
 
-      // 获取所有报名记录（按报名时间排序）
+      // 获取所有报名记录
       const { data: registrations } = await supabase
         .from('registrations')
         .select(`
@@ -108,14 +117,16 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         }
       }
 
-      // 获取所有成绩（用于后续按轮次查询）
+      // 获取所有成绩
       const allRegIds = registrations.map(r => r.id)
       const { data: allResults } = await supabase
         .from('results')
         .select('*')
         .in('registration_id', allRegIds)
 
-      // 按项目和轮次分组
+      console.log('[LivePage] 所有成绩记录数:', allResults?.length)
+
+      // 按项目和轮次分组成绩
       const resultsByEventRound = new Map<string, any[]>()
       allResults?.forEach(res => {
         const key = `${res.event_id}_${res.round}`
@@ -123,13 +134,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         resultsByEventRound.get(key)!.push(res)
       })
 
-      // 构建排名数据
+      // 为每个项目构建当前轮次的排名
       const newRankingsMap: Record<number, any[]> = {}
       for (const event of evts) {
         const currentRound = initialRoundMap[event.id]
         const roundResults = resultsByEventRound.get(`${event.id}_${currentRound}`) || []
-        const eventRegs = registrations.filter(r => r.event_id === event.id)
+        console.log(`[LivePage] 项目 ${event.name} 轮次 ${currentRound} 成绩数:`, roundResults.length)
 
+        const eventRegs = registrations.filter(r => r.event_id === event.id)
         const groupMap = new Map<string, any>()
         for (const reg of eventRegs) {
           const result = roundResults.find(r => r.registration_id === reg.id)
@@ -178,10 +190,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     fetchData()
   }, [competitionId])
 
-  // 当轮次变化时，重新查询该项目的成绩
-  const handleRoundChange = async (eventId: number, round: number) => {
-    setSelectedRoundMap(prev => ({ ...prev, [eventId]: round }))
-    // 重新获取该项目该轮次的成绩
+  // 切换轮次时重新查询
+  const handleRoundChange = async (eventId: number, newRound: number) => {
+    setSelectedRoundMap(prev => ({ ...prev, [eventId]: newRound }))
+
+    // 重新获取该项目的该轮次成绩
     const { data: registrations } = await supabase
       .from('registrations')
       .select(`
@@ -217,7 +230,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       .from('results')
       .select('*')
       .in('registration_id', regIds)
-      .eq('round', round)
+      .eq('round', newRound)
 
     const groupMap = new Map<string, any>()
     for (const reg of eventRegs) {
@@ -286,14 +299,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
       {events.map(event => {
         const rankings = rankingsMap[event.id] || []
-        const availableRounds = availableRoundsMap[event.id] || [1]
+        const availableRounds = availableRoundsMap[event.id] || [1,2,3,4]
         const currentRound = selectedRoundMap[event.id] || availableRounds[0]
         return (
           <div key={event.id} className="card mb-8" ref={el => { eventRefs.current[event.id] = el }}>
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <h2 className="text-lg font-semibold">{event.name}</h2>
-                {availableRounds.length > 1 && (
+                {availableRounds.length > 0 && (
                   <select
                     className="form-select w-auto text-sm"
                     value={currentRound}
