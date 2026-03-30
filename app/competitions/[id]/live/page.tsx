@@ -114,8 +114,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           user_id,
           event_id,
           status,
-          created_at,
-          profiles!inner (id, username, site_id)
+          created_at
         `)
         .eq('competition_id', competitionId)
         .eq('event_id', option.eventId)
@@ -126,6 +125,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         setRankings([])
         return
       }
+
+      // 获取选手信息
+      const userIds = [...new Set(registrations.map(r => r.user_id))]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, site_id')
+        .in('id', userIds)
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
       // 计算报名序号
       const userOrder = new Map()
@@ -160,8 +167,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           })
         }
         const group = groupMap.get(groupId)
-        const profile = reg.profiles
-        if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
+        const profile = profileMap.get(reg.user_id)
+        if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
           group.users.push({
             user_id: reg.user_id,
             username: profile.username,
@@ -195,7 +202,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return
     setSelectedOption(opt)
-    // 加载该选项的成绩
+
+    // 获取报名记录
     const { data: registrations } = await supabase
       .from('registrations')
       .select(`
@@ -203,8 +211,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         user_id,
         event_id,
         status,
-        created_at,
-        profiles!inner (id, username, site_id)
+        created_at
       `)
       .eq('competition_id', competitionId)
       .eq('event_id', opt.eventId)
@@ -215,6 +222,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       setRankings([])
       return
     }
+
+    // 获取选手信息
+    const userIds = [...new Set(registrations.map(r => r.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, site_id')
+      .in('id', userIds)
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     const userOrder = new Map()
     for (const reg of registrations) {
@@ -246,8 +261,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         })
       }
       const group = groupMap.get(groupId)
-      const profile = reg.profiles
-      if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
+      const profile = profileMap.get(reg.user_id)
+      if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
         group.users.push({
           user_id: reg.user_id,
           username: profile.username,
