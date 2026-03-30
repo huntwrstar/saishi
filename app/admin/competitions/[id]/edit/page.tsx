@@ -49,8 +49,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     registration_end: '',
     base_fee: 0,
   })
-  const [events, setEvents] = useState<any[]>([])
-  const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number }[]>([])
+  const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number; rounds: number[] }[]>([])
   const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean; rounds: number[] }[]>([])
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -111,9 +110,12 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         .select('*')
         .eq('competition_id', competitionId)
       if (data) {
-        setEvents(data)
         const fixedNames = ['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲']
-        const fixed = data.filter(e => fixedNames.includes(e.name)).map(e => ({ name: e.name, extra_fee: e.extra_fee }))
+        const fixed = data.filter(e => fixedNames.includes(e.name)).map(e => ({
+          name: e.name,
+          extra_fee: e.extra_fee,
+          rounds: e.rounds || [1,2,3,4],
+        }))
         const custom = data.filter(e => !fixedNames.includes(e.name)).map(e => ({
           name: e.name,
           rule: e.calculation_rule,
@@ -143,7 +145,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     editor.chain().focus().setHighlight({ color }).run()
   }
 
-  const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
+  const handleFixedEventToggle = (event: { name: string; extra_fee: number; rounds: number[] }) => {
     setSelectedFixedEvents(prev => {
       const exists = prev.some(e => e.name === event.name)
       if (exists) return prev.filter(e => e.name !== event.name)
@@ -154,6 +156,19 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   const updateFixedEventFee = (eventName: string, fee: number) => {
     setSelectedFixedEvents(prev =>
       prev.map(e => e.name === eventName ? { ...e, extra_fee: fee } : e)
+    )
+  }
+
+  const updateFixedEventRounds = (eventName: string, roundValue: number, checked: boolean) => {
+    setSelectedFixedEvents(prev =>
+      prev.map(e => {
+        if (e.name !== eventName) return e
+        const currentRounds = e.rounds || []
+        const newRounds = checked
+          ? [...currentRounds, roundValue].sort()
+          : currentRounds.filter(r => r !== roundValue)
+        return { ...e, rounds: newRounds }
+      })
     )
   }
 
@@ -170,11 +185,10 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   const updateCustomEventRounds = (index: number, roundValue: number, checked: boolean) => {
     const updated = [...customEvents]
     const currentRounds = updated[index].rounds || []
-    if (checked) {
-      updated[index].rounds = [...currentRounds, roundValue].sort()
-    } else {
-      updated[index].rounds = currentRounds.filter(r => r !== roundValue)
-    }
+    const newRounds = checked
+      ? [...currentRounds, roundValue].sort()
+      : currentRounds.filter(r => r !== roundValue)
+    updated[index].rounds = newRounds
     setCustomEvents(updated)
   }
 
@@ -205,23 +219,32 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       return
     }
 
-    // 更新固定项目（只更新 extra_fee）
-    for (const fixed of selectedFixedEvents) {
-      await supabase
-        .from('events')
-        .update({ extra_fee: fixed.extra_fee })
-        .eq('competition_id', competitionId)
-        .eq('name', fixed.name)
-    }
-
-    // 更新自定义项目（先删除旧的再插入）
+    // 更新固定项目：先删除旧的固定项目记录，再重新插入（因为轮次可能变化）
     const fixedNames = ['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲']
     await supabase
       .from('events')
       .delete()
       .eq('competition_id', competitionId)
-      .not('name', 'in', `(${fixedNames.map(n => `'${n}'`).join(',')})`)
+      .in('name', fixedNames)
+    const fixedEventsToInsert = selectedFixedEvents.map(e => ({
+      competition_id: competitionId,
+      name: e.name,
+      calculation_rule: 'avg_of_5_trim',
+      extra_fee: e.extra_fee,
+      is_team: false,
+      rounds: e.rounds,
+    }))
+    if (fixedEventsToInsert.length) {
+      const { error: fixedError } = await supabase.from('events').insert(fixedEventsToInsert)
+      if (fixedError) alert('更新固定项目失败：' + fixedError.message)
+    }
 
+    // 更新自定义项目：删除旧的再插入
+    await supabase
+      .from('events')
+      .delete()
+      .eq('competition_id', competitionId)
+      .not('name', 'in', `(${fixedNames.map(n => `'${n}'`).join(',')})`)
     const customEventsToInsert = customEvents.map(ce => ({
       competition_id: competitionId,
       name: ce.name,
@@ -305,36 +328,60 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
+        {/* 固定项目 - 支持轮次选择 */}
         <div className="form-group">
-          <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="form-label">固定项目 (可多选，可设置额外收费和轮次)</label>
+          <div className="space-y-3">
             {['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'].map(event => {
-              const isSelected = selectedFixedEvents.some(e => e.name === event)
+              const selected = selectedFixedEvents.find(e => e.name === event)
+              const isSelected = !!selected
+              const extraFee = selected?.extra_fee ?? 0
+              const rounds = selected?.rounds ?? [1,2,3,4]
               return (
-                <div key={event} className="flex items-center gap-2">
-                  <label className="flex items-center gap-1">
+                <div key={event} className="border border-gray-200 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleFixedEventToggle({ name: event, extra_fee: 0, rounds: [1,2,3,4] })}
+                      />
+                      {event}
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleFixedEventToggle({ name: event, extra_fee: 0 })}
+                      type="number"
+                      step="0.01"
+                      placeholder="额外收费"
+                      className="w-24 px-1 py-0.5 text-sm border rounded"
+                      value={extraFee}
+                      onChange={e => updateFixedEventFee(event, parseFloat(e.target.value) || 0)}
+                      disabled={!isSelected}
                     />
-                    {event}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="额外收费"
-                    className="w-20 px-1 py-0.5 text-sm border rounded"
-                    value={selectedFixedEvents.find(e => e.name === event)?.extra_fee ?? 0}
-                    onChange={e => updateFixedEventFee(event, parseFloat(e.target.value) || 0)}
-                    disabled={!isSelected}
-                  />
+                  </div>
+                  {isSelected && (
+                    <div className="ml-6">
+                      <label className="block text-sm font-medium mb-1">轮次（可多选）</label>
+                      <div className="flex gap-3">
+                        {ROUNDS.map(r => (
+                          <label key={r.value} className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={rounds.includes(r.value)}
+                              onChange={(e) => updateFixedEventRounds(event, r.value, e.target.checked)}
+                            />
+                            {r.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
 
+        {/* 自定义项目 */}
         <div className="form-group">
           <label className="form-label">自定义项目</label>
           <button type="button" onClick={addCustomEvent} className="btn btn-outline mb-2">添加自定义项目</button>

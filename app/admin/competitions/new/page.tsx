@@ -51,7 +51,7 @@ export default function NewCompetition() {
     registration_end: '',
     base_fee: 0,
   })
-  const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number }[]>([])
+  const [selectedFixedEvents, setSelectedFixedEvents] = useState<{ name: string; extra_fee: number; rounds: number[] }[]>([])
   const [customEvents, setCustomEvents] = useState<{ name: string; rule: string; extra_fee: number; is_team: boolean; rounds: number[] }[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -90,17 +90,30 @@ export default function NewCompetition() {
     editor.chain().focus().setHighlight({ color }).run()
   }
 
-  const handleFixedEventToggle = (event: { name: string; extra_fee: number }) => {
+  const handleFixedEventToggle = (event: { name: string; extra_fee: number; rounds: number[] }) => {
     setSelectedFixedEvents(prev => {
       const exists = prev.some(e => e.name === event.name)
       if (exists) return prev.filter(e => e.name !== event.name)
-      return [...prev, { ...event }]
+      return [...prev, { ...event, rounds: [1,2,3,4] }]
     })
   }
 
   const updateFixedEventFee = (eventName: string, fee: number) => {
     setSelectedFixedEvents(prev =>
       prev.map(e => e.name === eventName ? { ...e, extra_fee: fee } : e)
+    )
+  }
+
+  const updateFixedEventRounds = (eventName: string, roundValue: number, checked: boolean) => {
+    setSelectedFixedEvents(prev =>
+      prev.map(e => {
+        if (e.name !== eventName) return e
+        const currentRounds = e.rounds || []
+        const newRounds = checked
+          ? [...currentRounds, roundValue].sort()
+          : currentRounds.filter(r => r !== roundValue)
+        return { ...e, rounds: newRounds }
+      })
     )
   }
 
@@ -117,11 +130,10 @@ export default function NewCompetition() {
   const updateCustomEventRounds = (index: number, roundValue: number, checked: boolean) => {
     const updated = [...customEvents]
     const currentRounds = updated[index].rounds || []
-    if (checked) {
-      updated[index].rounds = [...currentRounds, roundValue].sort()
-    } else {
-      updated[index].rounds = currentRounds.filter(r => r !== roundValue)
-    }
+    const newRounds = checked
+      ? [...currentRounds, roundValue].sort()
+      : currentRounds.filter(r => r !== roundValue)
+    updated[index].rounds = newRounds
     setCustomEvents(updated)
   }
 
@@ -161,7 +173,7 @@ export default function NewCompetition() {
       calculation_rule: 'avg_of_5_trim',
       extra_fee: event.extra_fee,
       is_team: false,
-      rounds: [1,2,3,4],
+      rounds: event.rounds,
     }))
 
     const customEventsToInsert = customEvents.map(ce => ({
@@ -190,6 +202,7 @@ export default function NewCompetition() {
     <div className="container py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-6">新建赛事</h1>
       <form onSubmit={handleSubmit} className="card p-6">
+        {/* 基本信息 */}
         <div className="form-group">
           <label className="form-label">赛事名称</label>
           <input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
@@ -203,6 +216,7 @@ export default function NewCompetition() {
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
 
+        {/* 富文本编辑器 */}
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
           {editor && (
@@ -249,36 +263,60 @@ export default function NewCompetition() {
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
+        {/* 固定项目 - 支持轮次选择 */}
         <div className="form-group">
-          <label className="form-label">固定项目 (可多选，可设置额外收费)</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="form-label">固定项目 (可多选，可设置额外收费和轮次)</label>
+          <div className="space-y-3">
             {FIXED_EVENTS.map(event => {
-              const isSelected = selectedFixedEvents.some(e => e.name === event)
+              const selected = selectedFixedEvents.find(e => e.name === event)
+              const isSelected = !!selected
+              const extraFee = selected?.extra_fee ?? 0
+              const rounds = selected?.rounds ?? [1,2,3,4]
               return (
-                <div key={event} className="flex items-center gap-2">
-                  <label className="flex items-center gap-1">
+                <div key={event} className="border border-gray-200 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleFixedEventToggle({ name: event, extra_fee: 0, rounds: [1,2,3,4] })}
+                      />
+                      {event}
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleFixedEventToggle({ name: event, extra_fee: 0 })}
+                      type="number"
+                      step="0.01"
+                      placeholder="额外收费"
+                      className="w-24 px-1 py-0.5 text-sm border rounded"
+                      value={extraFee}
+                      onChange={e => updateFixedEventFee(event, parseFloat(e.target.value) || 0)}
+                      disabled={!isSelected}
                     />
-                    {event}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="额外收费"
-                    className="w-20 px-1 py-0.5 text-sm border rounded"
-                    value={selectedFixedEvents.find(e => e.name === event)?.extra_fee ?? 0}
-                    onChange={e => updateFixedEventFee(event, parseFloat(e.target.value) || 0)}
-                    disabled={!isSelected}
-                  />
+                  </div>
+                  {isSelected && (
+                    <div className="ml-6">
+                      <label className="block text-sm font-medium mb-1">轮次（可多选）</label>
+                      <div className="flex gap-3">
+                        {ROUNDS.map(r => (
+                          <label key={r.value} className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={rounds.includes(r.value)}
+                              onChange={(e) => updateFixedEventRounds(event, r.value, e.target.checked)}
+                            />
+                            {r.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
 
+        {/* 自定义项目 */}
         <div className="form-group">
           <label className="form-label">自定义项目</label>
           <button type="button" onClick={addCustomEvent} className="btn btn-outline mb-2">添加自定义项目</button>
