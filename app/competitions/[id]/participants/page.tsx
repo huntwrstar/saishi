@@ -87,9 +87,9 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
             <tbody>
               {participants.map(p => (
                 <tr key={p.order} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.order}记
-                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.username}记
-                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.events.join(', ')}记
+                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.order}</td>
+                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.username}</td>
+                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{p.events.join(', ')}</td>
                 </tr>
               ))}
             </tbody>

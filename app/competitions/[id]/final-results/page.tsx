@@ -21,13 +21,21 @@ const formatTime = (seconds: number | null): string => {
   return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.padStart(5, '0')}`
 }
 
+interface RankItem {
+  rank: number
+  users: { username: string }[]
+  average: number
+  best: number
+  attemptData: string[]
+}
+
 export default function FinalResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const [competitionId, setCompetitionId] = useState<string | null>(null)
   const [competition, setCompetition] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
   const [mode, setMode] = useState<'top3' | 'all'>('top3')
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null)
-  const [rankingsData, setRankingsData] = useState<any>(null)
+  const [rankingsData, setRankingsData] = useState<Record<number, RankItem[]> | Record<string, RankItem[]> | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -73,7 +81,7 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
     }
 
     const fetchTop3 = async (evts: any[]) => {
-      const top3Results: any = {}
+      const top3Results: Record<number, RankItem[]> = {}
       for (const event of evts) {
         const rounds = event.rounds || [1, 2, 3, 4]
         const finalRound = Math.max(...rounds)
@@ -158,7 +166,7 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
       if (!event) return
 
       const rounds = event.rounds || [1, 2, 3, 4]
-      const roundResults: any = {}
+      const roundResults: Record<string, RankItem[]> = {}
 
       const { data: registrations } = await supabase
         .from('registrations')
@@ -233,7 +241,7 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
           best: item.best,
           attemptData: item.attemptData,
         }))
-        roundResults[round] = ranked
+        roundResults[round.toString()] = ranked
       }
       setRankingsData(roundResults)
     }
@@ -328,8 +336,8 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
       {mode === 'top3' && (
         <>
           {events.map(event => {
-            const top3 = rankingsData?.[event.id] || []
-            const finalRound = Math.max(...(event.rounds || [1,2,3,4]))
+            const top3 = (rankingsData as Record<number, RankItem[]>)?.[event.id] || []
+            const finalRound = Math.max(...(event.rounds || [1, 2, 3, 4]))
             const roundLabel = ROUNDS.find(r => r.value === finalRound)?.label || '决赛'
             return (
               <div key={event.id} style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', marginBottom: '1.5rem', overflow: 'hidden' }}>
@@ -342,28 +350,29 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#f9fafb' }}>
+                        <tr>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>名次</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>选手</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>成绩详情</th>
-                        </thead>
-                        <tbody>
-                          {top3.map(item => {
-                            const usernames = item.users.map((u: any) => u.username).join(', ')
-                            return (
-                              <tr key={item.rank} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}记
-                               </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {top3.map((item) => {
+                          const usernames = item.users.map((u) => u.username).join(', ')
+                          return (
+                            <tr key={item.rank} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -381,7 +390,7 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
             <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>暂无成绩</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              {Object.entries(rankingsData).map(([round, groups]: [string, any[]]) => {
+              {Object.entries(rankingsData as Record<string, RankItem[]>).map(([round, groups]) => {
                 const roundNum = parseInt(round)
                 const roundLabel = ROUNDS.find(r => r.value === roundNum)?.label || `第${roundNum}轮`
                 return (
@@ -389,28 +398,29 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
                     <h3 style={{ padding: '0.75rem 1rem', backgroundColor: '#f3f4f6', fontSize: '1rem', fontWeight: '600' }}>{roundLabel}</h3>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#f9fafb' }}>
+                        <tr>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>排名</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>选手</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>成绩详情</th>
-                        </thead>
-                        <tbody>
-                          {groups.map((item: any, idx: number) => {
-                            const usernames = item.users.map((u: any) => u.username).join(', ')
-                            return (
-                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}记
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}记
-                               </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map((item, idx) => {
+                          const usernames = item.users.map((u) => u.username).join(', ')
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}</td>
+                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )
               })}
