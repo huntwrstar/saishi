@@ -79,7 +79,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 排序：固定项目按顺序，自定义项目按 id 升序
+      // 排序：固定项目按 FIXED_EVENTS_ORDER 顺序，自定义项目按 id 升序
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
