@@ -166,7 +166,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           })
         }
         const group = groupMap.get(groupId)
-        const profile = reg.profiles
+        const profile = reg.profiles as { id: string; username: string; site_id: string }
         if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
           group.users.push({
             user_id: reg.user_id,
@@ -251,7 +251,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         })
       }
       const group = groupMap.get(groupId)
-      const profile = reg.profiles
+      const profile = reg.profiles as { id: string; username: string; site_id: string }
       if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
         group.users.push({
           user_id: reg.user_id,
@@ -327,8 +327,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     <th>平均</th>
                     <th>最好</th>
                     <th>详情</th>
-                  </tr>
-                </thead>
+                  </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
                     const orderSet = new Set<number>(group.users.map((u: any) => u.order))
@@ -336,13 +335,13 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     const usernames = group.users.map((u: any) => u.username).join(', ')
                     return (
                       <tr key={idx}>
-                        <td>{group.rank ? group.rank : '-'}</td>
-                        <td>{orderNumbers}</td>
-                        <td>{usernames}</td>
-                        <td>{formatTime(group.average)}</td>
-                        <td>{formatTime(group.best)}</td>
-                        <td>{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
-                      </tr>
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
+                       </tr>
                     )
                   })}
                 </tbody>
