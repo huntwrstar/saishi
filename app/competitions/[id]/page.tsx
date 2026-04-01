@@ -182,27 +182,42 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
 
   return (
     <div className="container py-8">
+      {/* 返回导航 */}
+      <div style={{ marginBottom: '1rem' }}>
+        <Link href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          ← 返回赛事列表
+        </Link>
+      </div>
+
       <div className="card p-6 mb-8">
         <h1 className="text-xl font-bold mb-4">{competition.name}</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 mb-4">
-<p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
-<p>地点：{competition.location}</p>
-<p>基础报名费：¥{competition.base_fee}</p>
-{competition.registration_start && (
-  <p>报名时间：{new Date(competition.registration_start).toLocaleString()} - {competition.registration_end ? new Date(competition.registration_end).toLocaleString() : '无结束'}</p>
-)}
-<p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleString() : '无'}</p>
+          <p>时间：{new Date(competition.datetime).toLocaleString()}</p>
+          <p>地点：{competition.location}</p>
+          <p>基础报名费：¥{competition.base_fee}</p>
+          {competition.registration_start && (
+            <p>报名时间：{new Date(competition.registration_start).toLocaleString()} - {competition.registration_end ? new Date(competition.registration_end).toLocaleString() : '无结束'}</p>
+          )}
+          <p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleString() : '无'}</p>
         </div>
         <details className="mb-4">
-          <summary className="text-primary cursor-pointer">关于比赛</summary>
-<div
-  className="mt-2 text-gray-600"
-  dangerouslySetInnerHTML={{ __html: competition.description || '' }}
-/>
+          <summary className="text-blue-600 cursor-pointer">关于比赛</summary>
+          <div className="mt-2 text-gray-600" dangerouslySetInnerHTML={{ __html: competition.description || '' }} />
         </details>
-        <div className="flex gap-2">
-          <Link href={`/competitions/${competitionId}/live`} className="btn btn-primary">成绩直播</Link>
-          <Link href={`/competitions/${competitionId}/participants`} className="btn btn-outline">参赛选手</Link>
+        <div className="flex flex-wrap gap-3">
+          {!competition.is_finished && new Date() > new Date(competition.datetime) && (
+            <Link href={`/competitions/${competitionId}/live`} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+              成绩直播
+            </Link>
+          )}
+          {competition.is_finished && (
+            <Link href={`/competitions/${competitionId}/final-results`} className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+              赛果
+            </Link>
+          )}
+          <Link href={`/competitions/${competitionId}/participants`} className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+            参赛选手
+          </Link>
         </div>
       </div>
 

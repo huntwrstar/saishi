@@ -1,11 +1,8 @@
-import { supabaseServer } from '@/lib/supabase/server'
+import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 export default async function Home() {
-  const { data: competitions } = await supabaseServer
+  const { data: competitions } = await supabase
     .from('competitions')
     .select('*')
     .order('datetime', { ascending: false })
@@ -22,17 +19,23 @@ export default async function Home() {
                 <p>日期：{new Date(comp.datetime).toLocaleDateString()}</p>
                 <p>地点：{comp.location}</p>
                 {comp.registration_start && (
-                  <p>报名：{new Date(comp.registration_start).toLocaleString()} - {comp.registration_end ? new Date(comp.registration_end).toLocaleString() : '无结束'}</p>
+                  <p>报名：{new Date(comp.registration_start).toLocaleDateString()} - {comp.registration_end ? new Date(comp.registration_end).toLocaleDateString() : '无结束'}</p>
                 )}
-                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleString()}</p>}
+                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleDateString()}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link href={`/competitions/${comp.id}`} className="btn btn-primary">查看详情</Link>
-                {new Date() > new Date(comp.datetime) && !comp.is_finished && (
-                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">成绩直播</Link>
+                <Link href={`/competitions/${comp.id}`} className="btn btn-primary">
+                  查看详情
+                </Link>
+                {!comp.is_finished && new Date() > new Date(comp.datetime) && (
+                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">
+                    成绩直播
+                  </Link>
                 )}
                 {comp.is_finished && (
-                  <Link href={`/competitions/${comp.id}/live`} className="btn btn-secondary">赛果</Link>
+                  <Link href={`/competitions/${comp.id}/final-results`} className="btn btn-secondary">
+                    赛果
+                  </Link>
                 )}
               </div>
             </div>
