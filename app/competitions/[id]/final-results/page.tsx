@@ -77,7 +77,6 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
       for (const event of evts) {
         const rounds = event.rounds || [1, 2, 3, 4]
         const finalRound = Math.max(...rounds)
-
         const { data: registrations } = await supabase
           .from('registrations')
           .select('id, user_id, event_id, status, created_at')
@@ -250,12 +249,8 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
 
   const handleModeChange = (newMode: 'top3' | 'all') => {
     setMode(newMode)
-    if (newMode === 'top3') {
-      // 重新加载 top3 数据（已在 useEffect 中依赖 mode）
-    } else {
-      if (selectedEvent === null && events.length > 0) {
-        setSelectedEvent(events[0].id)
-      }
+    if (newMode === 'all' && selectedEvent === null && events.length > 0) {
+      setSelectedEvent(events[0].id)
     }
   }
 
@@ -334,7 +329,8 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
         <>
           {events.map(event => {
             const top3 = rankingsData?.[event.id] || []
-            const roundLabel = ROUNDS.find(r => r.value === Math.max(...(event.rounds || [1,2,3,4])))?.label || '决赛'
+            const finalRound = Math.max(...(event.rounds || [1,2,3,4]))
+            const roundLabel = ROUNDS.find(r => r.value === finalRound)?.label || '决赛'
             return (
               <div key={event.id} style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', marginBottom: '1.5rem', overflow: 'hidden' }}>
                 <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
@@ -352,23 +348,22 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>成绩详情</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {top3.map(item => {
-                          const usernames = item.users.map((u: any) => u.username).join(', ')
-                          return (
-                            <tr key={item.rank} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {top3.map(item => {
+                            const usernames = item.users.map((u: any) => u.username).join(', ')
+                            return (
+                              <tr key={item.rank} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}记
+                               </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                   </div>
                 )}
               </div>
@@ -400,23 +395,22 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好成绩</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>成绩详情</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groups.map((item: any, idx: number) => {
-                          const usernames = item.users.map((u: any) => u.username).join(', ')
-                          return (
-                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}</td>
-                              <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {groups.map((item: any, idx: number) => {
+                            const usernames = item.users.map((u: any) => u.username).join(', ')
+                            return (
+                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.rank}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.average)}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(item.best)}记
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{item.attemptData.join(', ')}记
+                               </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                   </div>
                 )
               })}

@@ -169,8 +169,8 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
     fetchData()
   }
 
-  if (loading) return <div className="text-center py-8">加载中...</div>
-  if (!competition) return <div className="text-center text-red-500 py-8">赛事不存在</div>
+  if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>加载中...</div>
+  if (!competition) return <div style={{ textAlign: 'center', padding: '2rem', color: 'red' }}>赛事不存在</div>
 
   const isPastWithdrawal = competition.withdrawal_deadline ? new Date() > new Date(competition.withdrawal_deadline) : false
   const isRegistrationOpen = (() => {
@@ -181,18 +181,17 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
   })()
 
   return (
-    <div className="container py-8">
-      {/* 返回导航 */}
+    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           ← 返回赛事列表
         </Link>
       </div>
 
-      <div className="card p-6 mb-8">
-        <h1 className="text-xl font-bold mb-4">{competition.name}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 mb-4">
-          <p>时间：{new Date(competition.datetime).toLocaleString()}</p>
+      <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '1.5rem', marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>{competition.name}</h1>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          <p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
           <p>地点：{competition.location}</p>
           <p>基础报名费：¥{competition.base_fee}</p>
           {competition.registration_start && (
@@ -200,29 +199,29 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
           )}
           <p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleString() : '无'}</p>
         </div>
-        <details className="mb-4">
-          <summary className="text-blue-600 cursor-pointer">关于比赛</summary>
-          <div className="mt-2 text-gray-600" dangerouslySetInnerHTML={{ __html: competition.description || '' }} />
+        <details style={{ marginBottom: '1rem' }}>
+          <summary style={{ color: '#3b82f6', cursor: 'pointer' }}>关于比赛</summary>
+          <p style={{ marginTop: '0.5rem' }}>{competition.description}</p>
         </details>
-        <div className="flex flex-wrap gap-3">
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {!competition.is_finished && new Date() > new Date(competition.datetime) && (
-            <Link href={`/competitions/${competitionId}/live`} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <Link href={`/competitions/${competitionId}/live`} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
               成绩直播
             </Link>
           )}
           {competition.is_finished && (
-            <Link href={`/competitions/${competitionId}/final-results`} className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+            <Link href={`/competitions/${competitionId}/final-results`} style={{ backgroundColor: '#8b5cf6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
               赛果
             </Link>
           )}
-          <Link href={`/competitions/${competitionId}/participants`} className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+          <Link href={`/competitions/${competitionId}/participants`} style={{ backgroundColor: '#4b5563', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
             参赛选手
           </Link>
         </div>
       </div>
 
-      <h2 className="text-lg font-semibold mb-4">项目列表</h2>
-      <div className="space-y-4">
+      <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>项目列表</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {events.map(event => {
           const reg = registrations.find(r => r.event_id === event.id)
           const isRegistered = reg && reg.status === 'registered'
@@ -230,8 +229,8 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
           const isSelected = selectedEvents.includes(event.id)
 
           return (
-            <div key={event.id} className="card p-4 flex flex-wrap justify-between items-center">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div key={event.id} style={{ backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', padding: '1rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={isRegistered || isSelected}
@@ -243,35 +242,43 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
                       setSelectedEvents(selectedEvents.filter(id => id !== event.id))
                     }
                   }}
-                  className="w-4 h-4"
+                  style={{ width: '1rem', height: '1rem' }}
                 />
-                <span className="font-medium">{event.name}</span>
-                {event.extra_fee > 0 && <span className="text-sm text-gray-500">(+¥{event.extra_fee})</span>}
+                <span style={{ fontWeight: '500' }}>{event.name}</span>
+                {event.extra_fee > 0 && <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>(+¥{event.extra_fee})</span>}
               </label>
               {isRegistered && (
                 <button
                   onClick={() => reg && handleWithdraw(reg.id, event.id)}
                   disabled={isPastWithdrawal || actionLoading === event.id}
-                  className="btn btn-danger text-sm"
+                  style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
                 >
                   {actionLoading === event.id ? '处理中...' : '退赛'}
                 </button>
               )}
-              {isWithdrawn && <span className="text-sm text-gray-500">已退赛</span>}
+              {isWithdrawn && <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>已退赛</span>}
             </div>
           )
         })}
       </div>
 
       {user && isRegistrationOpen && (
-        <div className="card p-4 mt-6">
-          <p className="font-semibold">总费用：¥{totalFee.toFixed(2)}</p>
-          <div className="flex gap-2 mt-4">
-            <button onClick={handleBatchRegister} disabled={loading || selectedEvents.length === 0} className="btn btn-primary">
+        <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)', padding: '1rem', marginTop: '2rem' }}>
+          <p style={{ fontWeight: '600' }}>总费用：¥{totalFee.toFixed(2)}</p>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+            <button
+              onClick={handleBatchRegister}
+              disabled={loading || selectedEvents.length === 0}
+              style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer' }}
+            >
               {loading ? '提交中...' : '报名选中项目'}
             </button>
             {registrations.some(r => r.status === 'registered') && !isPastWithdrawal && (
-              <button onClick={handleWithdrawAll} disabled={loading} className="btn btn-danger">
+              <button
+                onClick={handleWithdrawAll}
+                disabled={loading}
+                style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer' }}
+              >
                 退赛全部项目
               </button>
             )}
