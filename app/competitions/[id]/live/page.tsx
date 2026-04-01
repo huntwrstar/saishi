@@ -343,12 +343,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     const usernames = group.users.map((u: any) => u.username).join(', ')
                     return (
                       <tr key={idx}>
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}记
-                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}记
-                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}记
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}记
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}记
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}记
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
                       </tr>
                     )
                   })}
