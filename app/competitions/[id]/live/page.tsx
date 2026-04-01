@@ -15,6 +15,12 @@ const STATUS_MAP: Record<string, string> = {
   finished: '已结束',
 }
 
+// 固定项目顺序（与新建赛事页面保持一致）
+const FIXED_EVENTS_ORDER = [
+  '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
+  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
+]
+
 const formatTime = (seconds: number | null): string => {
   if (seconds === null || isNaN(seconds)) return '-'
   if (seconds < 60) return seconds.toFixed(2)
@@ -76,10 +82,20 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
+      // 对项目排序：固定项目按 FIXED_EVENTS_ORDER 顺序，自定义项目按 id 升序
+      const sortedEvents = [...evts].sort((a, b) => {
+        const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
+        const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+        if (aIndex !== -1) return -1
+        if (bIndex !== -1) return 1
+        return a.id - b.id
+      })
+
       // 构建选项列表
       const opts: Option[] = []
-      for (const event of evts) {
-        const rounds = event.rounds || [1,2,3,4]
+      for (const event of sortedEvents) {
+        const rounds = event.rounds || [1, 2, 3, 4]
         const statusMap = event.rounds_status || {}
         for (const round of rounds) {
           const status = statusMap[round] || 'not_started'
@@ -114,7 +130,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           user_id,
           event_id,
           status,
-          created_at
+          created_at,
+          profiles!inner (id, username, site_id)
         `)
         .eq('competition_id', competitionId)
         .eq('event_id', option.eventId)
@@ -125,14 +142,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         setRankings([])
         return
       }
-
-      // 获取选手信息
-      const userIds = [...new Set(registrations.map(r => r.user_id))]
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, site_id')
-        .in('id', userIds)
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
       // 计算报名序号
       const userOrder = new Map()
@@ -167,8 +176,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           })
         }
         const group = groupMap.get(groupId)
-        const profile = profileMap.get(reg.user_id)
-        if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
+        const profile = reg.profiles
+        if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
           group.users.push({
             user_id: reg.user_id,
             username: profile.username,
@@ -202,8 +211,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return
     setSelectedOption(opt)
-
-    // 获取报名记录
+    // 加载该选项的成绩
     const { data: registrations } = await supabase
       .from('registrations')
       .select(`
@@ -211,7 +219,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         user_id,
         event_id,
         status,
-        created_at
+        created_at,
+        profiles!inner (id, username, site_id)
       `)
       .eq('competition_id', competitionId)
       .eq('event_id', opt.eventId)
@@ -222,14 +231,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       setRankings([])
       return
     }
-
-    // 获取选手信息
-    const userIds = [...new Set(registrations.map(r => r.user_id))]
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, username, site_id')
-      .in('id', userIds)
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
     const userOrder = new Map()
     for (const reg of registrations) {
@@ -261,8 +262,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         })
       }
       const group = groupMap.get(groupId)
-      const profile = profileMap.get(reg.user_id)
-      if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
+      const profile = reg.profiles
+      if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
         group.users.push({
           user_id: reg.user_id,
           username: profile.username,
@@ -320,7 +321,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <h2 className="text-lg font-semibold">
-              {selectedOption.eventName} - {selectedOption.roundLabel} <span className="text-sm font-normal text-gray-500">({selectedOption.statusLabel})</span>
+              {selectedOption.eventName} - {selectedOption.roundLabel}{' '}
+              <span className="text-sm font-normal text-gray-500">({selectedOption.statusLabel})</span>
             </h2>
           </div>
           {rankings.length === 0 ? (
@@ -336,8 +338,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     <th>平均</th>
                     <th>最好</th>
                     <th>详情</th>
-                  </tr>
-                </thead>
+                  </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
                     const orderSet = new Set<number>(group.users.map((u: any) => u.order))
@@ -345,12 +346,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     const usernames = group.users.map((u: any) => u.username).join(', ')
                     return (
                       <tr key={idx}>
-                        <td>{group.rank ? group.rank : '-'}</td>
-                        <td>{orderNumbers}</td>
-                        <td>{usernames}</td>
-                        <td>{formatTime(group.average)}</td>
-                        <td>{formatTime(group.best)}</td>
-                        <td>{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
                       </tr>
                     )
                   })}
