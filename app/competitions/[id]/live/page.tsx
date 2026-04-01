@@ -58,11 +58,9 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     unwrapParams()
   }, [params])
 
-  // 加载赛事信息、项目列表、轮次状态，构建下拉选项
   useEffect(() => {
     if (!competitionId) return
     const fetchData = async () => {
-      // 获取赛事
       const { data: comp } = await supabase
         .from('competitions')
         .select('*')
@@ -71,7 +69,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       setCompetition(comp)
       setTitle(comp?.is_finished ? '赛果' : '成绩直播')
 
-      // 获取项目列表
       const { data: evts } = await supabase
         .from('events')
         .select('*')
@@ -82,7 +79,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 对项目排序：固定项目按 FIXED_EVENTS_ORDER 顺序，自定义项目按 id 升序
+      // 排序：固定项目按顺序，自定义项目按 id 升序
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -92,7 +89,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return a.id - b.id
       })
 
-      // 构建选项列表
       const opts: Option[] = []
       for (const event of sortedEvents) {
         const rounds = event.rounds || [1, 2, 3, 4]
@@ -111,7 +107,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
       setOptions(opts)
 
-      // 默认选中第一个有成绩或状态为“进行中”的选项
       let defaultOption = opts.find(opt => opt.status === 'in_progress')
       if (!defaultOption && opts.length) defaultOption = opts[0]
       if (defaultOption) {
@@ -122,7 +117,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
 
     const loadRankings = async (option: Option) => {
-      // 获取报名记录
       const { data: registrations } = await supabase
         .from('registrations')
         .select(`
@@ -143,7 +137,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 计算报名序号
       const userOrder = new Map()
       for (const reg of registrations) {
         if (!userOrder.has(reg.user_id)) {
@@ -151,7 +144,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         }
       }
 
-      // 获取成绩
       const regIds = registrations.map(r => r.id)
       const { data: results } = await supabase
         .from('results')
@@ -162,7 +154,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       const resultsByReg = new Map()
       results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
-      // 构建成绩组（支持团队）
       const groupMap = new Map<string, any>()
       for (const reg of registrations) {
         const result = resultsByReg.get(reg.id)
@@ -211,7 +202,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return
     setSelectedOption(opt)
-    // 加载该选项的成绩
     const { data: registrations } = await supabase
       .from('registrations')
       .select(`
