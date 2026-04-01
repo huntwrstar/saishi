@@ -166,7 +166,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           })
         }
         const group = groupMap.get(groupId)
-        const profile = reg.profiles as { id: string; username: string; site_id: string }
+        const profile = reg.profiles
         if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
           group.users.push({
             user_id: reg.user_id,
@@ -251,7 +251,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         })
       }
       const group = groupMap.get(groupId)
-      const profile = reg.profiles as { id: string; username: string; site_id: string }
+      const profile = reg.profiles
       if (!group.users.some((u: any) => u.user_id === reg.user_id)) {
         group.users.push({
           user_id: reg.user_id,
@@ -327,7 +327,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     <th>平均</th>
                     <th>最好</th>
                     <th>详情</th>
-                  </thead>
+                  </tr>
+                </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
                     const orderSet = new Set<number>(group.users.map((u: any) => u.order))
@@ -341,7 +342,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                         <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
-                       </tr>
+                      </tr>
                     )
                   })}
                 </tbody>
