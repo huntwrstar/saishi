@@ -17,7 +17,7 @@ const STATUS_MAP: Record<string, string> = {
 
 const FIXED_EVENTS_ORDER = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
-  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
+  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲',
 ]
 
 const formatTime = (seconds: number | null): string => {
@@ -78,7 +78,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 排序：固定项目按顺序，自定义项目按 id 升序
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -116,7 +115,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
 
     const loadRankings = async (option: Option) => {
-      // 第一步：获取报名记录（不包含 profiles 信息）
       const { data: registrations } = await supabase
         .from('registrations')
         .select('id, user_id, event_id, status, created_at')
@@ -130,7 +128,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 第二步：获取选手信息
       const userIds = [...new Set(registrations.map(r => r.user_id))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -138,7 +135,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         .in('id', userIds)
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
-      // 计算报名序号
       const userOrder = new Map()
       for (const reg of registrations) {
         if (!userOrder.has(reg.user_id)) {
@@ -146,7 +142,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         }
       }
 
-      // 获取成绩
       const regIds = registrations.map(r => r.id)
       const { data: results } = await supabase
         .from('results')
@@ -157,7 +152,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       const resultsByReg = new Map()
       results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
-      // 构建成绩组（支持团队）
       const groupMap = new Map<string, any>()
       for (const reg of registrations) {
         const result = resultsByReg.get(reg.id)
@@ -207,7 +201,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!opt) return
     setSelectedOption(opt)
 
-    // 第一步：获取报名记录
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id, event_id, status, created_at')
@@ -221,7 +214,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       return
     }
 
-    // 第二步：获取选手信息
     const userIds = [...new Set(registrations.map(r => r.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
@@ -291,17 +283,24 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  if (loading) return <div className="text-center py-8">加载中...</div>
-  if (!competition) return <div className="text-center text-red-500 py-8">赛事不存在</div>
+  if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>加载中...</div>
+  if (!competition) return <div style={{ textAlign: 'center', padding: '2rem', color: 'red' }}>赛事不存在</div>
 
   return (
-    <div className="container py-8">
-      <h1 className="text-xl font-bold mb-6">{title} - {competition.name}</h1>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{title} - {competition.name}</h1>
 
-      <div className="mb-6">
-        <label className="form-label">选择项目与轮次：</label>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>选择项目与轮次：</label>
         <select
-          className="form-select w-full md:w-auto"
+          style={{
+            width: '100%',
+            maxWidth: '300px',
+            padding: '0.5rem 0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.375rem',
+            fontSize: '0.875rem',
+          }}
           value={selectedOption ? `${selectedOption.eventId}_${selectedOption.round}` : ''}
           onChange={(e) => handleOptionChange(e.target.value)}
         >
@@ -315,40 +314,41 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       {selectedOption && (
-        <div className="card overflow-hidden">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-semibold">
+        <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>
               {selectedOption.eventName} - {selectedOption.roundLabel}{' '}
-              <span className="text-sm font-normal text-gray-500">({selectedOption.statusLabel})</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280' }}>({selectedOption.statusLabel})</span>
             </h2>
           </div>
           {rankings.length === 0 ? (
-            <div className="p-4 text-gray-500 text-center">暂无成绩</div>
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>暂无成绩</div>
           ) : (
-            <div className="table-container">
-              <table className="table">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>排名</th>
-                    <th>报名序号</th>
-                    <th>选手</th>
-                    <th>平均</th>
-                    <th>最好</th>
-                    <th>详情</th>
-                  </thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>排名</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>报名序号</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>选手</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>平均</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>最好</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>详情</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
                     const orderSet = new Set<number>(group.users.map((u: any) => u.order))
                     const orderNumbers = Array.from(orderSet).sort((a, b) => a - b).join(',')
                     const usernames = group.users.map((u: any) => u.username).join(', ')
                     return (
-                      <tr key={idx}>
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
+                      <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{group.rank ? group.rank : '-'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{orderNumbers}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(group.average)}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{formatTime(group.best)}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
                       </tr>
                     )
                   })}
@@ -366,8 +366,16 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           bottom: '20px',
           right: '20px',
           zIndex: 1000,
+          backgroundColor: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '9999px',
+          padding: '0.75rem',
+          boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+          cursor: 'pointer',
+          fontSize: '1.25rem',
+          lineHeight: '1',
         }}
-        className="btn btn-primary rounded-full p-3 shadow-lg"
         aria-label="回到顶部"
       >
         ↑
