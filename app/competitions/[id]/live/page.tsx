@@ -15,7 +15,6 @@ const STATUS_MAP: Record<string, string> = {
   finished: '已结束',
 }
 
-// 固定项目顺序（与新建赛事页面保持一致）
 const FIXED_EVENTS_ORDER = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
@@ -79,7 +78,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 排序：固定项目按 FIXED_EVENTS_ORDER 顺序，自定义项目按 id 升序
+      // 排序：固定项目按顺序，自定义项目按 id 升序
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -328,7 +327,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     <th>平均</th>
                     <th>最好</th>
                     <th>详情</th>
-                  </thead>
+                  </tr>
+                </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
                     const orderSet = new Set<number>(group.users.map((u: any) => u.order))
@@ -336,12 +336,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     const usernames = group.users.map((u: any) => u.username).join(', ')
                     return (
                       <tr key={idx}>
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.rank ? group.rank : '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{orderNumbers}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{usernames}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.average)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{formatTime(group.best)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
+                        <td>{group.rank ? group.rank : '-'}</td>
+                        <td>{orderNumbers}</td>
+                        <td>{usernames}</td>
+                        <td>{formatTime(group.average)}</td>
+                        <td>{formatTime(group.best)}</td>
+                        <td>{group.attemptData.length ? group.attemptData.join(', ') : '-'}</td>
                       </tr>
                     )
                   })}
