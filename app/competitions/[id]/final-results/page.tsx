@@ -10,6 +10,12 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
+// 固定项目顺序（与成绩直播页保持一致）
+const FIXED_EVENTS_ORDER = [
+  '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
+  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
+]
+
 const formatTime = (seconds: number | null): string => {
   if (seconds === null || isNaN(seconds)) return '-'
   if (seconds < 60) return seconds.toFixed(2)
@@ -60,21 +66,32 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
         .from('events')
         .select('*')
         .eq('competition_id', competitionId)
-      setEvents(evts || [])
 
       if (!evts || evts.length === 0) {
+        setEvents([])
         setLoading(false)
         return
       }
 
+      // 排序：固定项目按顺序，自定义项目按 id 升序
+      const sortedEvents = [...evts].sort((a, b) => {
+        const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
+        const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+        if (aIndex !== -1) return -1
+        if (bIndex !== -1) return 1
+        return a.id - b.id
+      })
+      setEvents(sortedEvents)
+
       if (mode === 'top3') {
-        await fetchTop3(evts)
+        await fetchTop3(sortedEvents)
       } else {
         if (selectedEvent !== null) {
           await fetchAllRoundsForEvent(selectedEvent)
-        } else if (evts.length > 0) {
-          setSelectedEvent(evts[0].id)
-          await fetchAllRoundsForEvent(evts[0].id)
+        } else if (sortedEvents.length > 0) {
+          setSelectedEvent(sortedEvents[0].id)
+          await fetchAllRoundsForEvent(sortedEvents[0].id)
         }
       }
       setLoading(false)
