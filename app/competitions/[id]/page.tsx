@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as React from 'react'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 interface Competition {
   id: number
@@ -191,13 +192,11 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '1.5rem', marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>{competition.name}</h1>
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
-          <p>地点：{competition.location}</p>
-          <p>基础报名费：¥{competition.base_fee}</p>
-          {competition.registration_start && (
-            <p>报名时间：{new Date(competition.registration_start).toLocaleString()} - {competition.registration_end ? new Date(competition.registration_end).toLocaleString() : '无结束'}</p>
-          )}
-          <p>退赛截止：{competition.withdrawal_deadline ? new Date(competition.withdrawal_deadline).toLocaleString() : '无'}</p>
+<p>日期：{formatDate(competition.datetime)}</p>
+{competition.registration_start && (
+  <p>报名时间：{formatDateTime(competition.registration_start)} - {competition.registration_end ? formatDateTime(competition.registration_end) : '无结束'}</p>
+)}
+<p>退赛截止：{competition.withdrawal_deadline ? formatDateTime(competition.withdrawal_deadline) : '无'}</p>
         </div>
         <details style={{ marginBottom: '1rem' }}>
           <summary style={{ color: '#3b82f6', cursor: 'pointer' }}>关于比赛</summary>

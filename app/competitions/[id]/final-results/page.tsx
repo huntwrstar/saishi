@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { formatDate } from '@/lib/format'
 
 const ROUNDS = [
   { value: 1, label: '初赛' },
@@ -295,7 +296,7 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
       </div>
 
       <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>赛果 - {competition.name}</h1>
-      <p style={{ color: '#4b5563', marginBottom: '1.5rem' }}>比赛日期：{new Date(competition.datetime).toLocaleDateString()}</p>
+      <p style={{ color: '#4b5563', marginBottom: '1.5rem' }}>比赛日期：{formatDate(competition.datetime)}</p>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
         <button

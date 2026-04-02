@@ -1,6 +1,7 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
+import { formatDate } from '@/lib/format'
 
 // 轮次名称映射
 const ROUND_NAMES: Record<number, string> = {
@@ -100,7 +101,7 @@ export default function ProfilePage() {
               <div key={competition.id} className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="p-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-800">{competition.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">时间：{new Date(competition.datetime).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500 mt-1">时间：{formatDate(competition.datetime)}</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">

@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { formatDate } from '@/lib/format'
 
 export default function AdminCompetitions() {
   const [competitions, setCompetitions] = useState<any[]>([])
