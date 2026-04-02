@@ -18,12 +18,12 @@ export default async function Home() {
             <div style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>{comp.name}</h2>
               <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1rem' }}>
-                <p>日期：{new Date(comp.datetime).toLocaleDateString()}</p>
+                <p>日期：{new Date(comp.datetime).toLocaleDateString('zh-CN')}</p>
                 <p>地点：{comp.location}</p>
                 {comp.registration_start && (
-                  <p>报名：{new Date(comp.registration_start).toLocaleDateString()} - {comp.registration_end ? new Date(comp.registration_end).toLocaleDateString() : '无结束'}</p>
+                  <p>报名：{new Date(comp.registration_start).toLocaleDateString('zh-CN')} - {comp.registration_end ? new Date(comp.registration_end).toLocaleDateString('zh-CN') : '无结束'}</p>
                 )}
-                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleDateString()}</p>}
+                {comp.withdrawal_deadline && <p>退赛截止：{new Date(comp.withdrawal_deadline).toLocaleDateString('zh-CN')}</p>}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <Link href={`/competitions/${comp.id}`} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none', fontSize: '0.875rem' }}>
