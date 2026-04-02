@@ -64,7 +64,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       Highlight.configure({ multicolor: true }),
     ],
     content: form.description,
-    onUpdate: ({ editor}) => {
+    onUpdate: ({ editor }) => {
       setForm(prev => ({ ...prev, description: editor.getHTML() }))
     },
     editorProps: {
@@ -214,18 +214,19 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       })
       .eq('id', competitionId)
     if (error) {
-      alert('更新失败：' + error.message)
+      alert('更新赛事失败：' + error.message)
       setLoading(false)
       return
     }
 
-    // 更新固定项目：先删除旧的固定项目记录，再重新插入（因为轮次可能变化）
+    // 更新固定项目：先删除该赛事下的所有固定项目，再重新插入
     const fixedNames = ['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲']
     await supabase
       .from('events')
       .delete()
       .eq('competition_id', competitionId)
       .in('name', fixedNames)
+
     const fixedEventsToInsert = selectedFixedEvents.map(e => ({
       competition_id: competitionId,
       name: e.name,
@@ -239,12 +240,13 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       if (fixedError) alert('更新固定项目失败：' + fixedError.message)
     }
 
-    // 更新自定义项目：删除旧的再插入
+    // 更新自定义项目：先删除所有自定义项目，再重新插入
     await supabase
       .from('events')
       .delete()
       .eq('competition_id', competitionId)
       .not('name', 'in', `(${fixedNames.map(n => `'${n}'`).join(',')})`)
+
     const customEventsToInsert = customEvents.map(ce => ({
       competition_id: competitionId,
       name: ce.name,

@@ -50,8 +50,8 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       .from('competitions')
       .select('*')
       .eq('id', competitionId)
-      .single()
-    setCompetition(comp)
+      .maybeSingle()
+    setCompetition(comp || null)
 
     const { data: evts } = await supabase
       .from('events')
@@ -190,7 +190,7 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
 
       <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '1.5rem', marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>{competition.name}</h1>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <p>日期：{new Date(competition.datetime).toLocaleDateString()}</p>
           <p>地点：{competition.location}</p>
           <p>基础报名费：¥{competition.base_fee}</p>
@@ -201,20 +201,23 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
         </div>
         <details style={{ marginBottom: '1rem' }}>
           <summary style={{ color: '#3b82f6', cursor: 'pointer' }}>关于比赛</summary>
-          <p style={{ marginTop: '0.5rem' }}>{competition.description}</p>
+          <div
+            style={{ marginTop: '0.5rem' }}
+            dangerouslySetInnerHTML={{ __html: competition.description || '' }}
+          />
         </details>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {!competition.is_finished && new Date() > new Date(competition.datetime) && (
-            <Link href={`/competitions/${competitionId}/live`} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
+            <Link href={`/competitions/${competition.id}/live`} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
               成绩直播
             </Link>
           )}
           {competition.is_finished && (
-            <Link href={`/competitions/${competitionId}/final-results`} style={{ backgroundColor: '#8b5cf6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
+            <Link href={`/competitions/${competition.id}/final-results`} style={{ backgroundColor: '#8b5cf6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
               赛果
             </Link>
           )}
-          <Link href={`/competitions/${competitionId}/participants`} style={{ backgroundColor: '#4b5563', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
+          <Link href={`/competitions/${competition.id}/participants`} style={{ backgroundColor: '#4b5563', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
             参赛选手
           </Link>
         </div>
