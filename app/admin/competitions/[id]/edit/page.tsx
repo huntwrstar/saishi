@@ -19,6 +19,11 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
+const FIXED_NAMES = [
+  '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
+  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
+]
+
 const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
 
 const ToolbarButton = ({ onClick, active, children, title }: any) => (
@@ -85,7 +90,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
       .from('competitions')
       .select('*')
       .eq('id', competitionId)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setForm({
@@ -110,13 +115,12 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         .select('*')
         .eq('competition_id', competitionId)
       if (data) {
-        const fixedNames = ['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲']
-        const fixed = data.filter(e => fixedNames.includes(e.name)).map(e => ({
+        const fixed = data.filter(e => FIXED_NAMES.includes(e.name)).map(e => ({
           name: e.name,
           extra_fee: e.extra_fee,
           rounds: e.rounds || [1,2,3,4],
         }))
-        const custom = data.filter(e => !fixedNames.includes(e.name)).map(e => ({
+        const custom = data.filter(e => !FIXED_NAMES.includes(e.name)).map(e => ({
           name: e.name,
           rule: e.calculation_rule,
           extra_fee: e.extra_fee,
@@ -199,8 +203,10 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    // 1. 更新赛事基本信息
     const toLocal = (dateStr: string) => dateStr || null
-    const { error } = await supabase
+    const { error: compError } = await supabase
       .from('competitions')
       .update({
         name: form.name,
@@ -213,51 +219,52 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
         base_fee: form.base_fee,
       })
       .eq('id', competitionId)
-    if (error) {
-      alert('更新赛事失败：' + error.message)
+
+    if (compError) {
+      alert('更新赛事失败：' + compError.message)
       setLoading(false)
       return
     }
 
-    // 更新固定项目：先删除该赛事下的所有固定项目，再重新插入
-    const fixedNames = ['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲']
-    await supabase
+    // 2. 删除该赛事下的所有项目（固定+自定义）
+    const { error: deleteError } = await supabase
       .from('events')
       .delete()
       .eq('competition_id', competitionId)
-      .in('name', fixedNames)
 
-    const fixedEventsToInsert = selectedFixedEvents.map(e => ({
-      competition_id: competitionId,
-      name: e.name,
-      calculation_rule: 'avg_of_5_trim',
-      extra_fee: e.extra_fee,
-      is_team: false,
-      rounds: e.rounds,
-    }))
-    if (fixedEventsToInsert.length) {
-      const { error: fixedError } = await supabase.from('events').insert(fixedEventsToInsert)
-      if (fixedError) alert('更新固定项目失败：' + fixedError.message)
+    if (deleteError) {
+      alert('删除旧项目失败：' + deleteError.message)
+      setLoading(false)
+      return
     }
 
-    // 更新自定义项目：先删除所有自定义项目，再重新插入
-    await supabase
-      .from('events')
-      .delete()
-      .eq('competition_id', competitionId)
-      .not('name', 'in', `(${fixedNames.map(n => `'${n}'`).join(',')})`)
+    // 3. 重新插入所有选中的项目
+    const allEventsToInsert = [
+      ...selectedFixedEvents.map(e => ({
+        competition_id: competitionId,
+        name: e.name,
+        calculation_rule: 'avg_of_5_trim',
+        extra_fee: e.extra_fee,
+        is_team: false,
+        rounds: e.rounds,
+      })),
+      ...customEvents.map(ce => ({
+        competition_id: competitionId,
+        name: ce.name,
+        calculation_rule: ce.rule,
+        extra_fee: ce.extra_fee,
+        is_team: ce.is_team,
+        rounds: ce.rounds,
+      })),
+    ]
 
-    const customEventsToInsert = customEvents.map(ce => ({
-      competition_id: competitionId,
-      name: ce.name,
-      calculation_rule: ce.rule,
-      extra_fee: ce.extra_fee,
-      is_team: ce.is_team,
-      rounds: ce.rounds,
-    }))
-    if (customEventsToInsert.length) {
-      const { error: eventsError } = await supabase.from('events').insert(customEventsToInsert)
-      if (eventsError) alert('更新自定义项目失败：' + eventsError.message)
+    if (allEventsToInsert.length > 0) {
+      const { error: insertError } = await supabase.from('events').insert(allEventsToInsert)
+      if (insertError) {
+        alert('保存项目失败：' + insertError.message)
+        setLoading(false)
+        return
+      }
     }
 
     alert('更新成功')
@@ -271,6 +278,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
     <div className="container py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-6">编辑赛事</h1>
       <form onSubmit={handleSubmit} className="card p-6">
+        {/* 基本信息 */}
         <div className="form-group">
           <label className="form-label">赛事名称</label>
           <input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
@@ -284,6 +292,7 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="text" className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} required />
         </div>
 
+        {/* 富文本编辑器 */}
         <div className="form-group">
           <label className="form-label">介绍（关于比赛）</label>
           {editor && (
@@ -330,11 +339,11 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
-        {/* 固定项目 - 支持轮次选择 */}
+        {/* 固定项目 */}
         <div className="form-group">
           <label className="form-label">固定项目 (可多选，可设置额外收费和轮次)</label>
           <div className="space-y-3">
-            {['三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲', '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'].map(event => {
+            {FIXED_NAMES.map(event => {
               const selected = selectedFixedEvents.find(e => e.name === event)
               const isSelected = !!selected
               const extraFee = selected?.extra_fee ?? 0
