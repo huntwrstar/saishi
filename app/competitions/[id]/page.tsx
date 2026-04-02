@@ -6,6 +6,12 @@ import Link from 'next/link'
 import * as React from 'react'
 import { formatDate, formatDateTime } from '@/lib/format'
 
+// 固定项目顺序（与成绩直播页、赛果页保持一致）
+const FIXED_EVENTS_ORDER = [
+  '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
+  '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
+]
+
 interface Competition {
   id: number
   name: string
@@ -58,7 +64,17 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       .from('events')
       .select('*')
       .eq('competition_id', competitionId)
-    setEvents(evts || [])
+
+    // 排序：固定项目按预定义顺序，自定义项目按 id 升序
+    const sortedEvents = (evts || []).sort((a, b) => {
+      const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
+      const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+      if (aIndex !== -1) return -1
+      if (bIndex !== -1) return 1
+      return a.id - b.id
+    })
+    setEvents(sortedEvents)
 
     if (user) {
       const { data: regs } = await supabase
@@ -192,7 +208,8 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '1.5rem', marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>{competition.name}</h1>
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-<p>日期：{formatDate(competition.datetime)}</p>
+          <p>日期：{formatDate(competition.datetime)}</p>
+<p>基础报名费：¥{competition.base_fee}</p>
 {competition.registration_start && (
   <p>报名时间：{formatDateTime(competition.registration_start)} - {competition.registration_end ? formatDateTime(competition.registration_end) : '无结束'}</p>
 )}
