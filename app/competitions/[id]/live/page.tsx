@@ -50,163 +50,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('成绩直播')
 
-  useEffect(() => {
-    const unwrapParams = async () => {
-      const { id } = await params
-      setCompetitionId(id)
-    }
-    unwrapParams()
-  }, [params])
-
-  useEffect(() => {
-    if (!competitionId) return
-    const fetchData = async () => {
-      const { data: comp } = await supabase
-        .from('competitions')
-        .select('*')
-        .eq('id', competitionId)
-        .single()
-      setCompetition(comp)
-      setTitle(comp?.is_finished ? '赛果' : '成绩直播')
-
-      const { data: evts } = await supabase
-        .from('events')
-        .select('*')
-        .eq('competition_id', competitionId)
-
-      if (!evts || evts.length === 0) {
-        setLoading(false)
-        return
-      }
-
-      const sortedEvents = [...evts].sort((a, b) => {
-        const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
-        const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
-        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-        if (aIndex !== -1) return -1
-        if (bIndex !== -1) return 1
-        return a.id - b.id
-      })
-
-      const opts: Option[] = []
-      for (const event of sortedEvents) {
-        const rounds = event.rounds || [1, 2, 3, 4]
-        const statusMap = event.rounds_status || {}
-        for (const round of rounds) {
-          const status = statusMap[round] || 'not_started'
-          opts.push({
-            eventId: event.id,
-            eventName: event.name,
-            round,
-            roundLabel: ROUNDS.find(r => r.value === round)?.label || `第${round}轮`,
-            status,
-            statusLabel: STATUS_MAP[status],
-          })
-        }
-      }
-      setOptions(opts)
-
-      let defaultOption = opts.find(opt => opt.status === 'in_progress')
-      if (!defaultOption && opts.length) defaultOption = opts[0]
-      if (defaultOption) {
-        setSelectedOption(defaultOption)
-        await loadRankings(defaultOption)
-      }
-      setLoading(false)
-    }
-
-    const loadRankings = async (option: Option) => {
-      const { data: registrations } = await supabase
-        .from('registrations')
-        .select('id, user_id, event_id, status, created_at')
-        .eq('competition_id', competitionId)
-        .eq('event_id', option.eventId)
-        .eq('status', 'registered')
-        .order('created_at', { ascending: true })
-
-      if (!registrations || registrations.length === 0) {
-        setRankings([])
-        return
-      }
-
-      const userIds = [...new Set(registrations.map(r => r.user_id))]
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, site_id')
-        .in('id', userIds)
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
-
-      const userOrder = new Map()
-      for (const reg of registrations) {
-        if (!userOrder.has(reg.user_id)) {
-          userOrder.set(reg.user_id, userOrder.size + 1)
-        }
-      }
-
-      const regIds = registrations.map(r => r.id)
-      const { data: results } = await supabase
-        .from('results')
-        .select('*')
-        .in('registration_id', regIds)
-        .eq('round', option.round)
-
-      const resultsByReg = new Map()
-      results?.forEach(r => resultsByReg.set(r.registration_id, r))
-
-      const groupMap = new Map<string, any>()
-      for (const reg of registrations) {
-        const result = resultsByReg.get(reg.id)
-        const groupId = result?.group_id || `single-${reg.id}`
-        if (!groupMap.has(groupId)) {
-          groupMap.set(groupId, {
-            users: [],
-            average: result?.average ?? null,
-            best: result?.best ?? null,
-            attemptData: result?.attempt_data ?? [],
-          })
-        }
-        const group = groupMap.get(groupId)
-        const profile = profileMap.get(reg.user_id)
-        if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
-          group.users.push({
-            user_id: reg.user_id,
-            username: profile.username,
-            site_id: profile.site_id,
-            order: userOrder.get(reg.user_id),
-          })
-        }
-      }
-
-      let groups = Array.from(groupMap.values())
-      groups.sort((a, b) => {
-        if (a.average === null && b.average === null) return 0
-        if (a.average === null) return 1
-        if (b.average === null) return -1
-        if (a.average === b.average) return (a.best || 0) - (b.best || 0)
-        return (a.average || 0) - (b.average || 0)
-      })
-
-      let rank = 1
-      const ranked = groups.map(item => ({
-        ...item,
-        rank: item.average !== null ? rank++ : null,
-      }))
-      setRankings(ranked)
-    }
-
-    fetchData()
-  }, [competitionId])
-
-  const handleOptionChange = async (optionKey: string) => {
-    const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
-    if (!opt) return
-    setSelectedOption(opt)
-
+  // 加载排名的核心函数（供初始化和实时更新复用）
+  const loadRankings = async (option: Option) => {
+    // 获取报名记录（不含 profiles 信息，避免复杂关联）
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id, event_id, status, created_at')
       .eq('competition_id', competitionId)
-      .eq('event_id', opt.eventId)
+      .eq('event_id', option.eventId)
       .eq('status', 'registered')
       .order('created_at', { ascending: true })
 
@@ -215,6 +66,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       return
     }
 
+    // 获取选手信息
     const userIds = [...new Set(registrations.map(r => r.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
@@ -222,6 +74,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       .in('id', userIds)
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
+    // 计算报名序号（按首次报名时间）
     const userOrder = new Map()
     for (const reg of registrations) {
       if (!userOrder.has(reg.user_id)) {
@@ -229,16 +82,18 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
     }
 
+    // 获取当前轮次的成绩
     const regIds = registrations.map(r => r.id)
     const { data: results } = await supabase
       .from('results')
       .select('*')
       .in('registration_id', regIds)
-      .eq('round', opt.round)
+      .eq('round', option.round)
 
     const resultsByReg = new Map()
     results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
+    // 按组（团队或个人）合并成绩
     const groupMap = new Map<string, any>()
     for (const reg of registrations) {
       const result = resultsByReg.get(reg.id)
@@ -263,6 +118,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
     }
 
+    // 排序：有成绩的按平均升序，无成绩的排后
     let groups = Array.from(groupMap.values())
     groups.sort((a, b) => {
       if (a.average === null && b.average === null) return 0
@@ -272,12 +128,115 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       return (a.average || 0) - (b.average || 0)
     })
 
+    // 添加排名
     let rank = 1
     const ranked = groups.map(item => ({
       ...item,
       rank: item.average !== null ? rank++ : null,
     }))
     setRankings(ranked)
+  }
+
+  // 初始化数据（赛事、项目、选项）和实时订阅
+  useEffect(() => {
+    const unwrapParams = async () => {
+      const { id } = await params
+      setCompetitionId(id)
+    }
+    unwrapParams()
+  }, [params])
+
+  useEffect(() => {
+    if (!competitionId) return
+
+    const fetchInitialData = async () => {
+      // 获取赛事
+      const { data: comp } = await supabase
+        .from('competitions')
+        .select('*')
+        .eq('id', competitionId)
+        .single()
+      setCompetition(comp)
+      setTitle(comp?.is_finished ? '赛果' : '成绩直播')
+
+      // 获取项目列表
+      const { data: evts } = await supabase
+        .from('events')
+        .select('*')
+        .eq('competition_id', competitionId)
+
+      if (!evts || evts.length === 0) {
+        setLoading(false)
+        return
+      }
+
+      // 排序项目：固定项目按顺序，自定义项目按 id 升序
+      const sortedEvents = [...evts].sort((a, b) => {
+        const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
+        const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+        if (aIndex !== -1) return -1
+        if (bIndex !== -1) return 1
+        return a.id - b.id
+      })
+
+      // 构建下拉选项
+      const opts: Option[] = []
+      for (const event of sortedEvents) {
+        const rounds = event.rounds || [1, 2, 3, 4]
+        const statusMap = event.rounds_status || {}
+        for (const round of rounds) {
+          const status = statusMap[round] || 'not_started'
+          opts.push({
+            eventId: event.id,
+            eventName: event.name,
+            round,
+            roundLabel: ROUNDS.find(r => r.value === round)?.label || `第${round}轮`,
+            status,
+            statusLabel: STATUS_MAP[status],
+          })
+        }
+      }
+      setOptions(opts)
+
+      // 默认选中进行中的轮次，否则第一个
+      let defaultOption = opts.find(opt => opt.status === 'in_progress')
+      if (!defaultOption && opts.length) defaultOption = opts[0]
+      if (defaultOption) {
+        setSelectedOption(defaultOption)
+        await loadRankings(defaultOption)
+      }
+      setLoading(false)
+    }
+
+    fetchInitialData()
+
+    // 实时订阅：监听 results 表的变更
+    const channel = supabase
+      .channel('results-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'results' },
+        async () => {
+          // 当成绩表有任何变化时，刷新当前选项的排名
+          if (selectedOption) {
+            await loadRankings(selectedOption)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [competitionId, selectedOption])
+
+  // 切换选项时重新加载排名
+  const handleOptionChange = async (optionKey: string) => {
+    const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
+    if (!opt) return
+    setSelectedOption(opt)
+    await loadRankings(opt)
   }
 
   const scrollToTop = () => {
@@ -335,14 +294,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                  <tr>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>排名</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>报名序号</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>选手</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>详情</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
