@@ -19,7 +19,7 @@ export default async function Home() {
             <div style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>{comp.name}</h2>
               <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1rem' }}>
-                <p>日期：{new Date(comp.datetime).toLocaleDateString('zh-CN')}</p>
+                <p>日期：{formatDate(comp.datetime)}</p>
                 <p>地点：{comp.location}</p>
                 {comp.registration_start && (
   <p>报名：{formatDateTime(comp.registration_start)} - {comp.registration_end ? formatDateTime(comp.registration_end) : '无结束'}</p>
