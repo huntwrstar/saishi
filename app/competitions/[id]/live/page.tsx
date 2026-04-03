@@ -65,7 +65,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
   const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
-  // 核心函数：加载排名，返回新的 registration -> groupIndex 映射
+  // 加载排名（返回 registration_id 到 group 索引的映射）
   const loadRankings = async (option: Option): Promise<Map<number, number>> => {
     const { data: registrations } = await supabase
       .from('registrations')
@@ -135,7 +135,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       entry.regIds.push(reg.id)
     }
 
-    // 转换为数组并排序
     const groups = Array.from(groupMap.values())
     groups.sort((a, b) => {
       const avgA = a.group.average ?? Infinity
@@ -164,7 +163,18 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     return newRegToGroup
   }
 
-  // 初始化数据（只执行一次，设置默认选项）
+  // 更新 options 中的状态（不改变已选中的选项）
+  const updateOptionsStatus = (eventId: number, newRoundsStatus: Record<string, string>) => {
+    setOptions(prev => prev.map(opt => {
+      if (opt.eventId === eventId) {
+        const status = newRoundsStatus[opt.round] || 'not_started'
+        return { ...opt, status, statusLabel: STATUS_MAP[status] }
+      }
+      return opt
+    }))
+  }
+
+  // 初始化数据
   useEffect(() => {
     const unwrapParams = async () => {
       const { id } = await params
@@ -195,7 +205,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 排序项目
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -205,7 +214,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return a.id - b.id
       })
 
-      // 构建选项
       const opts: Option[] = []
       for (const event of sortedEvents) {
         const rounds = event.rounds || [1, 2, 3, 4]
@@ -224,7 +232,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
       setOptions(opts)
 
-      // 默认选中：优先选进行中，否则选第一个（仅初始化）
+      // 默认选中：优先选进行中，否则第一个
       let defaultOption = opts.find(opt => opt.status === 'in_progress')
       if (!defaultOption && opts.length) defaultOption = opts[0]
       if (defaultOption) {
@@ -235,13 +243,14 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
 
     fetchInitialData()
-  }, [competitionId]) // 注意：不再依赖 selectedOption，避免循环
+  }, [competitionId])
 
-  // 实时订阅：监听成绩变更，自动刷新当前选项的排名（不改变选中选项）
+  // 实时订阅：监听 results 表（成绩变化）和 events 表（轮次状态变化）
   useEffect(() => {
     if (!competitionId || !selectedOption) return
 
-    const channel = supabase
+    // 订阅 results 表变化（成绩更新）
+    const resultsChannel = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
@@ -249,7 +258,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         async (payload) => {
           // 重新加载当前选项的排名
           await loadRankings(selectedOption)
-          // 可选：触发高亮（如果有 affected registration_id）
+          // 高亮触发
           let registrationId: number | null = null
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             registrationId = payload.new.registration_id
@@ -257,7 +266,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             registrationId = payload.old.registration_id
           }
           if (registrationId) {
-            // 延迟等待 DOM 更新
             setTimeout(() => {
               const idx = regToGroupIndex.get(registrationId)
               if (idx !== undefined) {
@@ -280,10 +288,28 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       )
       .subscribe()
 
+    // 订阅 events 表变化（轮次状态更新）
+    const eventsChannel = supabase
+      .channel('events-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'events' },
+        async (payload) => {
+          const updatedEvent = payload.new
+          const newRoundsStatus = updatedEvent.rounds_status || {}
+          // 更新对应项目的轮次状态显示
+          updateOptionsStatus(updatedEvent.id, newRoundsStatus)
+          // 如果当前选中的选项正好是这个项目的某个轮次，并且状态变化不影响成绩数据，不需要重新加载排名
+          // 但如果状态变为“进行中”且用户没有手动切换，不需要自动切换，保持当前选项
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(resultsChannel)
+      supabase.removeChannel(eventsChannel)
     }
-  }, [competitionId, selectedOption, regToGroupIndex]) // 依赖 selectedOption，但只用于加载排名，不会重置选中项
+  }, [competitionId, selectedOption, regToGroupIndex])
 
   // 用户手动切换选项
   const handleOptionChange = async (optionKey: string) => {
