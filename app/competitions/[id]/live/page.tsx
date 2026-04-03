@@ -62,37 +62,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [rankings, setRankings] = useState<RankGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('成绩直播')
-  // 存储 registration_id 到 group 索引的映射
   const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
-  // 存储定时器 ID，用于清理
   const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
-  // 触发高亮闪烁（通过直接操作 DOM，避免状态覆盖）
-  const triggerHighlight = (registrationId: number) => {
-    const groupIndex = regToGroupIndex.get(registrationId)
-    if (groupIndex === undefined) return
-
-    // 通过 data 属性定位行元素
-    const row = document.querySelector(`tr[data-group-idx="${groupIndex}"]`) as HTMLElement
-    if (!row) return
-
-    // 添加高亮类
-    row.classList.add('highlight-flash')
-
-    // 清除已有的定时器
-    if (timeoutRefs.current.has(registrationId)) {
-      clearTimeout(timeoutRefs.current.get(registrationId)!)
-    }
-    // 设置定时器移除高亮类（时长可调整，例如 3000 毫秒）
-    const timeout = setTimeout(() => {
-      row.classList.remove('highlight-flash')
-      timeoutRefs.current.delete(registrationId)
-    }, 8000) // ← 高亮持续时间，可改为 5000 等
-    timeoutRefs.current.set(registrationId, timeout)
-  }
-
-  // 加载排名的核心函数（同时构建 registration_id 到 group 索引的映射）
-  const loadRankings = async (option: Option) => {
+  // 核心函数：加载排名，返回新的 registration -> groupIndex 映射
+  const loadRankings = async (option: Option): Promise<Map<number, number>> => {
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id, event_id, status, created_at')
@@ -104,7 +78,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!registrations || registrations.length === 0) {
       setRankings([])
       setRegToGroupIndex(new Map())
-      return
+      return new Map()
     }
 
     const userIds = [...new Set(registrations.map(r => r.user_id))]
@@ -131,8 +105,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const resultsByReg = new Map()
     results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
-    // 按组聚合，同时记录每个组包含的 registration_id
-    const groupsWithRegIds: { group: RankGroup; regIds: number[] }[] = []
+    // 按组聚合
     const groupMap = new Map<string, { group: RankGroup; regIds: number[] }>()
     for (const reg of registrations) {
       const result = resultsByReg.get(reg.id)
@@ -188,8 +161,41 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
     setRankings(finalRanked)
     setRegToGroupIndex(newRegToGroup)
+    return newRegToGroup
   }
 
+  // 高亮函数（带重试机制）
+  const triggerHighlight = (registrationId: number, retryCount = 0) => {
+    // 使用最新的映射（直接从 state 读取，但 state 异步，通过闭包可能旧，改用传入的映射？）
+    // 为了可靠，从 state 中读取最新值
+    let groupIndex = regToGroupIndex.get(registrationId)
+    if (groupIndex === undefined) {
+      // 也许映射尚未更新，等待一段时间重试
+      if (retryCount < 5) {
+        setTimeout(() => triggerHighlight(registrationId, retryCount + 1), 100)
+      }
+      return
+    }
+    const row = document.querySelector(`tr[data-group-idx="${groupIndex}"]`) as HTMLElement
+    if (!row) {
+      if (retryCount < 5) {
+        setTimeout(() => triggerHighlight(registrationId, retryCount + 1), 100)
+      }
+      return
+    }
+    // 清除已有定时器
+    if (timeoutRefs.current.has(registrationId)) {
+      clearTimeout(timeoutRefs.current.get(registrationId)!)
+    }
+    row.classList.add('highlight-flash')
+    const timeout = setTimeout(() => {
+      row.classList.remove('highlight-flash')
+      timeoutRefs.current.delete(registrationId)
+    }, 3000)
+    timeoutRefs.current.set(registrationId, timeout)
+  }
+
+  // 初始化数据与实时订阅
   useEffect(() => {
     const unwrapParams = async () => {
       const { id } = await params
@@ -272,11 +278,27 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             registrationId = payload.old.registration_id
           }
           if (registrationId && selectedOption) {
-            await loadRankings(selectedOption)
-            // 等待 DOM 更新完成后再触发高亮
+            // 重新加载排名，并获取新的映射
+            const newMapping = await loadRankings(selectedOption)
+            // 等待 DOM 更新
             setTimeout(() => {
-              triggerHighlight(registrationId)
-            }, 50)
+              // 使用新映射查找索引
+              const idx = newMapping.get(registrationId)
+              if (idx !== undefined) {
+                const row = document.querySelector(`tr[data-group-idx="${idx}"]`) as HTMLElement
+                if (row) {
+                  if (timeoutRefs.current.has(registrationId)) {
+                    clearTimeout(timeoutRefs.current.get(registrationId)!)
+                  }
+                  row.classList.add('highlight-flash')
+                  const timeout = setTimeout(() => {
+                    row.classList.remove('highlight-flash')
+                    timeoutRefs.current.delete(registrationId)
+                  }, 3000)
+                  timeoutRefs.current.set(registrationId, timeout)
+                }
+              }
+            }, 100)
           }
         }
       )

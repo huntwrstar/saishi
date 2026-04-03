@@ -286,3 +286,11 @@ body {
 .highlight-flash {
   animation: flash 8s ease-out forwards;
 }
+
+.highlight-flash {
+  animation: flash 3s ease-out forwards;
+}
+@keyframes flash {
+  0% { background-color: #fee2e2; }
+  100% { background-color: transparent; }
+}
