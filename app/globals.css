@@ -288,7 +288,7 @@ body {
 }
 
 .highlight-flash {
-  animation: flash 3s ease-out forwards;
+  animation: flash 8s ease-out forwards;
 }
 @keyframes flash {
   0% { background-color: #fee2e2; }
