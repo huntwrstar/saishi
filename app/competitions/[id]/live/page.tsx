@@ -164,38 +164,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     return newRegToGroup
   }
 
-  // 高亮函数（带重试机制）
-  const triggerHighlight = (registrationId: number, retryCount = 0) => {
-    // 使用最新的映射（直接从 state 读取，但 state 异步，通过闭包可能旧，改用传入的映射？）
-    // 为了可靠，从 state 中读取最新值
-    let groupIndex = regToGroupIndex.get(registrationId)
-    if (groupIndex === undefined) {
-      // 也许映射尚未更新，等待一段时间重试
-      if (retryCount < 5) {
-        setTimeout(() => triggerHighlight(registrationId, retryCount + 1), 100)
-      }
-      return
-    }
-    const row = document.querySelector(`tr[data-group-idx="${groupIndex}"]`) as HTMLElement
-    if (!row) {
-      if (retryCount < 5) {
-        setTimeout(() => triggerHighlight(registrationId, retryCount + 1), 100)
-      }
-      return
-    }
-    // 清除已有定时器
-    if (timeoutRefs.current.has(registrationId)) {
-      clearTimeout(timeoutRefs.current.get(registrationId)!)
-    }
-    row.classList.add('highlight-flash')
-    const timeout = setTimeout(() => {
-      row.classList.remove('highlight-flash')
-      timeoutRefs.current.delete(registrationId)
-    }, 3000)
-    timeoutRefs.current.set(registrationId, timeout)
-  }
-
-  // 初始化数据与实时订阅
+  // 初始化数据（只执行一次，设置默认选项）
   useEffect(() => {
     const unwrapParams = async () => {
       const { id } = await params
@@ -226,6 +195,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
+      // 排序项目
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -235,6 +205,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return a.id - b.id
       })
 
+      // 构建选项
       const opts: Option[] = []
       for (const event of sortedEvents) {
         const rounds = event.rounds || [1, 2, 3, 4]
@@ -253,6 +224,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
       setOptions(opts)
 
+      // 默认选中：优先选进行中，否则选第一个（仅初始化）
       let defaultOption = opts.find(opt => opt.status === 'in_progress')
       if (!defaultOption && opts.length) defaultOption = opts[0]
       if (defaultOption) {
@@ -263,27 +235,31 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
 
     fetchInitialData()
+  }, [competitionId]) // 注意：不再依赖 selectedOption，避免循环
 
-    // 实时订阅
+  // 实时订阅：监听成绩变更，自动刷新当前选项的排名（不改变选中选项）
+  useEffect(() => {
+    if (!competitionId || !selectedOption) return
+
     const channel = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'results' },
         async (payload) => {
+          // 重新加载当前选项的排名
+          await loadRankings(selectedOption)
+          // 可选：触发高亮（如果有 affected registration_id）
           let registrationId: number | null = null
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             registrationId = payload.new.registration_id
           } else if (payload.eventType === 'DELETE') {
             registrationId = payload.old.registration_id
           }
-          if (registrationId && selectedOption) {
-            // 重新加载排名，并获取新的映射
-            const newMapping = await loadRankings(selectedOption)
-            // 等待 DOM 更新
+          if (registrationId) {
+            // 延迟等待 DOM 更新
             setTimeout(() => {
-              // 使用新映射查找索引
-              const idx = newMapping.get(registrationId)
+              const idx = regToGroupIndex.get(registrationId)
               if (idx !== undefined) {
                 const row = document.querySelector(`tr[data-group-idx="${idx}"]`) as HTMLElement
                 if (row) {
@@ -307,8 +283,9 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [competitionId, selectedOption])
+  }, [competitionId, selectedOption, regToGroupIndex]) // 依赖 selectedOption，但只用于加载排名，不会重置选中项
 
+  // 用户手动切换选项
   const handleOptionChange = async (optionKey: string) => {
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return

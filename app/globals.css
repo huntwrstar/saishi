@@ -278,17 +278,10 @@ body {
   background-color: #ffffff !important;  /* 白色背景 */
 }
 
-/* 高亮闪烁动画 */
-@keyframes flash {
-  0% { background-color: #fee2e2; }
-  100% { background-color: transparent; }
-}
-.highlight-flash {
-  animation: flash 8s ease-out forwards;
-}
+
 
 .highlight-flash {
-  animation: flash 8s ease-out forwards;
+  animation: flash 10s ease-out forwards;
 }
 @keyframes flash {
   0% { background-color: #fee2e2; }
