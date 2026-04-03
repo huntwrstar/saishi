@@ -94,7 +94,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return updated
       })
       timeoutRefs.current.delete(registrationId)
-    }, 3000)
+    }, 8000)
     timeoutRefs.current.set(registrationId, timeout)
   }
 
