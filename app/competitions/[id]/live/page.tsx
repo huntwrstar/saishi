@@ -1,6 +1,6 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
 const ROUNDS = [
@@ -41,18 +41,66 @@ interface Option {
   statusLabel: string
 }
 
+interface RankGroup {
+  users: {
+    user_id: string
+    username: string
+    site_id: string
+    order: number
+  }[]
+  average: number | null
+  best: number | null
+  attemptData: string[]
+  rank: number | null
+  highlight?: boolean // 用于闪烁控制
+}
+
 export default function LivePage({ params }: { params: Promise<{ id: string }> }) {
   const [competitionId, setCompetitionId] = useState<string | null>(null)
   const [competition, setCompetition] = useState<any>(null)
   const [options, setOptions] = useState<Option[]>([])
   const [selectedOption, setSelectedOption] = useState<Option | null>(null)
-  const [rankings, setRankings] = useState<any[]>([])
+  const [rankings, setRankings] = useState<RankGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('成绩直播')
+  // 存储 registration_id 到 group 索引的映射
+  const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
+  // 存储定时器 ID，用于清除
+  const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
-  // 加载排名的核心函数（供初始化和实时更新复用）
+  // 触发闪烁效果
+  const triggerHighlight = (registrationId: number) => {
+    const groupIndex = regToGroupIndex.get(registrationId)
+    if (groupIndex === undefined) return
+
+    setRankings(prev => {
+      const updated = [...prev]
+      if (updated[groupIndex]) {
+        updated[groupIndex] = { ...updated[groupIndex], highlight: true }
+      }
+      return updated
+    })
+
+    // 清除已有的定时器
+    if (timeoutRefs.current.has(registrationId)) {
+      clearTimeout(timeoutRefs.current.get(registrationId)!)
+    }
+    const timeout = setTimeout(() => {
+      setRankings(prev => {
+        const updated = [...prev]
+        if (updated[groupIndex]) {
+          updated[groupIndex] = { ...updated[groupIndex], highlight: false }
+        }
+        return updated
+      })
+      timeoutRefs.current.delete(registrationId)
+    }, 3000)
+    timeoutRefs.current.set(registrationId, timeout)
+  }
+
+  // 加载排名的核心函数（同时构建 registration_id 到 group 索引的映射）
   const loadRankings = async (option: Option) => {
-    // 获取报名记录（不含 profiles 信息，避免复杂关联）
+    // 获取报名记录
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id, event_id, status, created_at')
@@ -63,6 +111,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
     if (!registrations || registrations.length === 0) {
       setRankings([])
+      setRegToGroupIndex(new Map())
       return
     }
 
@@ -74,7 +123,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       .in('id', userIds)
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
-    // 计算报名序号（按首次报名时间）
+    // 计算报名序号
     const userOrder = new Map()
     for (const reg of registrations) {
       if (!userOrder.has(reg.user_id)) {
@@ -93,33 +142,38 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const resultsByReg = new Map()
     results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
-    // 按组（团队或个人）合并成绩
-    const groupMap = new Map<string, any>()
+    // 按组（团队或个人）合并成绩，同时记录每个 registration_id 对应的组索引
+    const groupMap = new Map<string, { group: RankGroup; regIds: number[] }>()
     for (const reg of registrations) {
       const result = resultsByReg.get(reg.id)
       const groupId = result?.group_id || `single-${reg.id}`
       if (!groupMap.has(groupId)) {
         groupMap.set(groupId, {
-          users: [],
-          average: result?.average ?? null,
-          best: result?.best ?? null,
-          attemptData: result?.attempt_data ?? [],
+          group: {
+            users: [],
+            average: result?.average ?? null,
+            best: result?.best ?? null,
+            attemptData: result?.attempt_data ?? [],
+            rank: null,
+          },
+          regIds: [],
         })
       }
-      const group = groupMap.get(groupId)
+      const entry = groupMap.get(groupId)!
       const profile = profileMap.get(reg.user_id)
-      if (profile && !group.users.some((u: any) => u.user_id === reg.user_id)) {
-        group.users.push({
+      if (profile && !entry.group.users.some(u => u.user_id === reg.user_id)) {
+        entry.group.users.push({
           user_id: reg.user_id,
           username: profile.username,
           site_id: profile.site_id,
           order: userOrder.get(reg.user_id),
         })
       }
+      entry.regIds.push(reg.id)
     }
 
-    // 排序：有成绩的按平均升序，无成绩的排后
-    let groups = Array.from(groupMap.values())
+    // 转换为数组并排序
+    let groups = Array.from(groupMap.values()).map(entry => entry.group)
     groups.sort((a, b) => {
       if (a.average === null && b.average === null) return 0
       if (a.average === null) return 1
@@ -134,7 +188,43 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       ...item,
       rank: item.average !== null ? rank++ : null,
     }))
-    setRankings(ranked)
+
+    // 构建 registration_id 到 group 索引的映射
+    const newRegToGroup = new Map<number, number>()
+    for (let idx = 0; idx < ranked.length; idx++) {
+      const group = ranked[idx]
+      // 需要根据组内 users 找到原始 entry 的 regIds
+      // 由于我们丢失了 regIds，需要在排序前就记录映射。更稳健的做法是在排序前建立映射，排序后根据用户 id 集合重新匹配。
+      // 这里简单起见：在排序前，我们已经有了 groupMap，其中每个 entry 包含 regIds。排序后，我们需要将排序后的组与 regIds 关联。
+      // 因为组内用户集合是唯一的，我们可以通过用户 id 集合来匹配。
+    }
+    // 更好的实现：在排序前，先将 groupsWithRegIds 排序，然后构建映射。
+    // 重构：将 groupsWithRegIds 作为数组排序，排序后生成 ranked 和映射。
+    const groupsWithRegIds = Array.from(groupMap.values())
+    groupsWithRegIds.sort((a, b) => {
+      const avgA = a.group.average ?? Infinity
+      const avgB = b.group.average ?? Infinity
+      if (avgA === avgB) return (a.group.best ?? Infinity) - (b.group.best ?? Infinity)
+      return avgA - avgB
+    })
+    let r = 1
+    const finalRanked: RankGroup[] = []
+    const regToIdx = new Map<number, number>()
+    for (let idx = 0; idx < groupsWithRegIds.length; idx++) {
+      const item = groupsWithRegIds[idx]
+      const group = item.group
+      const rankedGroup = {
+        ...group,
+        rank: group.average !== null ? r++ : null,
+      }
+      finalRanked.push(rankedGroup)
+      for (const regId of item.regIds) {
+        regToIdx.set(regId, idx)
+      }
+    }
+
+    setRankings(finalRanked)
+    setRegToGroupIndex(regToIdx)
   }
 
   // 初始化数据（赛事、项目、选项）和实时订阅
@@ -150,7 +240,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     if (!competitionId) return
 
     const fetchInitialData = async () => {
-      // 获取赛事
       const { data: comp } = await supabase
         .from('competitions')
         .select('*')
@@ -159,7 +248,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       setCompetition(comp)
       setTitle(comp?.is_finished ? '赛果' : '成绩直播')
 
-      // 获取项目列表
       const { data: evts } = await supabase
         .from('events')
         .select('*')
@@ -170,7 +258,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 排序项目：固定项目按顺序，自定义项目按 id 升序
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -180,7 +267,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return a.id - b.id
       })
 
-      // 构建下拉选项
       const opts: Option[] = []
       for (const event of sortedEvents) {
         const rounds = event.rounds || [1, 2, 3, 4]
@@ -199,7 +285,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
       setOptions(opts)
 
-      // 默认选中进行中的轮次，否则第一个
       let defaultOption = opts.find(opt => opt.status === 'in_progress')
       if (!defaultOption && opts.length) defaultOption = opts[0]
       if (defaultOption) {
@@ -211,16 +296,26 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
     fetchInitialData()
 
-    // 实时订阅：监听 results 表的变更
+    // 实时订阅：监听 results 表的变更，并触发高亮
     const channel = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'results' },
-        async () => {
-          // 当成绩表有任何变化时，刷新当前选项的排名
-          if (selectedOption) {
+        async (payload) => {
+          // 获取受影响的 registration_id
+          let registrationId: number | null = null
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            registrationId = payload.new.registration_id
+          } else if (payload.eventType === 'DELETE') {
+            registrationId = payload.old.registration_id
+          }
+          if (registrationId && selectedOption) {
+            // 重新加载当前选项的排名，同时触发高亮
+            // 注意：重新加载会重置整个 rankings，高亮需要在新数据中触发
             await loadRankings(selectedOption)
+            // 触发高亮
+            triggerHighlight(registrationId)
           }
         }
       )
@@ -231,7 +326,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
   }, [competitionId, selectedOption])
 
-  // 切换选项时重新加载排名
   const handleOptionChange = async (optionKey: string) => {
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return
@@ -248,7 +342,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
-      {/* 返回导航 */}
       <div style={{ marginBottom: '1rem' }}>
         <Link href={`/competitions/${competition.id}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>
           ← 返回赛事详情
@@ -305,11 +398,18 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                 </thead>
                 <tbody>
                   {rankings.map((group, idx) => {
-                    const orderSet = new Set<number>(group.users.map((u: any) => u.order))
+                    const orderSet = new Set<number>(group.users.map(u => u.order))
                     const orderNumbers = Array.from(orderSet).sort((a, b) => a - b).join(',')
-                    const usernames = group.users.map((u: any) => u.username).join(', ')
+                    const usernames = group.users.map(u => u.username).join(', ')
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: '1px solid #e5e7eb',
+                          transition: 'background-color 0.2s ease',
+                          backgroundColor: group.highlight ? '#fee2e2' : 'transparent',
+                        }}
+                      >
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{group.rank ? group.rank : '-'}</td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{orderNumbers}</td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{usernames}</td>
