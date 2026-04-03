@@ -163,12 +163,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     return newRegToGroup
   }
 
-  // 更新 options 中的状态（不改变已选中的选项）
-  const updateOptionsStatus = (eventId: number, newRoundsStatus: Record<string, string>) => {
+  // 更新 options 中指定项目-轮次的状态（实时刷新下拉选项的文字）
+  const updateOptionStatus = (eventId: number, round: number, newStatus: string) => {
     setOptions(prev => prev.map(opt => {
-      if (opt.eventId === eventId) {
-        const status = newRoundsStatus[opt.round] || 'not_started'
-        return { ...opt, status, statusLabel: STATUS_MAP[status] }
+      if (opt.eventId === eventId && opt.round === round) {
+        return { ...opt, status: newStatus, statusLabel: STATUS_MAP[newStatus] }
       }
       return opt
     }))
@@ -245,20 +244,19 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     fetchInitialData()
   }, [competitionId])
 
-  // 实时订阅：监听 results 表（成绩变化）和 events 表（轮次状态变化）
+  // 实时订阅：成绩变更 + 轮次状态变更
   useEffect(() => {
     if (!competitionId || !selectedOption) return
 
-    // 订阅 results 表变化（成绩更新）
+    // 订阅 results 表（成绩变化）
     const resultsChannel = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'results' },
         async (payload) => {
-          // 重新加载当前选项的排名
           await loadRankings(selectedOption)
-          // 高亮触发
+          // 高亮闪烁
           let registrationId: number | null = null
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             registrationId = payload.new.registration_id
@@ -288,7 +286,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       )
       .subscribe()
 
-    // 订阅 events 表变化（轮次状态更新）
+    // 订阅 events 表（轮次状态变化）
     const eventsChannel = supabase
       .channel('events-changes')
       .on(
@@ -297,10 +295,16 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         async (payload) => {
           const updatedEvent = payload.new
           const newRoundsStatus = updatedEvent.rounds_status || {}
-          // 更新对应项目的轮次状态显示
-          updateOptionsStatus(updatedEvent.id, newRoundsStatus)
-          // 如果当前选中的选项正好是这个项目的某个轮次，并且状态变化不影响成绩数据，不需要重新加载排名
-          // 但如果状态变为“进行中”且用户没有手动切换，不需要自动切换，保持当前选项
+          // 遍历该项目的所有轮次，更新对应选项的状态
+          const eventOptions = options.filter(opt => opt.eventId === updatedEvent.id)
+          for (const opt of eventOptions) {
+            const newStatus = newRoundsStatus[opt.round] || 'not_started'
+            if (opt.status !== newStatus) {
+              updateOptionStatus(updatedEvent.id, opt.round, newStatus)
+            }
+          }
+          // 如果当前选中的选项正好是状态变化的轮次，不需要重新加载排名（因为成绩未变）
+          // 但下拉选项文字已经更新
         }
       )
       .subscribe()
@@ -309,7 +313,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       supabase.removeChannel(resultsChannel)
       supabase.removeChannel(eventsChannel)
     }
-  }, [competitionId, selectedOption, regToGroupIndex])
+  }, [competitionId, selectedOption, regToGroupIndex, options])
 
   // 用户手动切换选项
   const handleOptionChange = async (optionKey: string) => {
