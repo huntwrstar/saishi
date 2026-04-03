@@ -277,3 +277,12 @@ body {
   padding: 0.75rem !important;           /* 内边距 */
   background-color: #ffffff !important;  /* 白色背景 */
 }
+
+/* 高亮闪烁动画 */
+@keyframes flash {
+  0% { background-color: #fee2e2; }
+  100% { background-color: transparent; }
+}
+.highlight-flash {
+  animation: flash 8s ease-out forwards;
+}
