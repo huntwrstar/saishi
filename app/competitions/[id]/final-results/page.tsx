@@ -3,9 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatDate } from '@/lib/format'
-export const metadata = {
-  title: '赛果 - 鹅城魔方赛事网',
-}
+
 
 const ROUNDS = [
   { value: 1, label: '初赛' },
@@ -47,6 +45,12 @@ export default function FinalResultsPage({ params }: { params: Promise<{ id: str
   const [selectedEvent, setSelectedEvent] = useState<number | null>(null)
   const [rankingsData, setRankingsData] = useState<Record<number, RankItem[]> | Record<string, RankItem[]> | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+  if (competition) {
+    document.title = `赛果 - ${competition.name} - 鹅城魔方赛事网`
+  }
+}, [competition])
 
   useEffect(() => {
     const unwrapParams = async () => {

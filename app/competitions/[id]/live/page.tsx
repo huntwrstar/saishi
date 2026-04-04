@@ -3,9 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
-export const metadata = {
-  title: '成绩直播 - 鹅城魔方赛事网',
-}
+
 const ROUNDS = [
   { value: 1, label: '初赛' },
   { value: 2, label: '复赛' },
@@ -68,6 +66,11 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
   const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
+  useEffect(() => {
+  if (competition) {
+    document.title = `成绩直播 - ${competition.name} - 鹅城魔方赛事网`
+  }
+}, [competition])
   // 加载排名的核心函数
   const loadRankings = async (option: Option): Promise<Map<number, number>> => {
     const { data: registrations } = await supabase

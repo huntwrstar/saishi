@@ -21,6 +21,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+  document.title = '个人中心 - 鹅城魔方赛事网'
+}, [])
+
+  useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)

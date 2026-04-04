@@ -1,7 +1,7 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect,useState } from 'react'
 import { pinyin } from 'pinyin-pro'
 
 export default function LoginPage() {
@@ -11,6 +11,10 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+  document.title = '登录/注册 - 鹅城魔方赛事网'
+}, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
