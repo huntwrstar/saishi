@@ -139,8 +139,16 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="container py-8 max-w-2xl">
+      {/* 返回按钮 */}
+      <div className="mb-4">
+        <Link href="/admin/competitions" className="text-blue-600 hover:underline">
+          ← 返回管理赛事
+        </Link>
+      </div>
+
       <h1 className="text-xl font-bold mb-6">编辑赛事</h1>
       <form onSubmit={handleSubmit} className="card p-6">
+        {/* ... 原有表单内容保持不变 ... */}
         <div className="form-group">
           <label className="form-label">赛事名称</label>
           <input type="text" className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
@@ -200,7 +208,6 @@ export default function EditCompetition({ params }: { params: Promise<{ id: stri
           <input type="datetime-local" className="form-input" value={form.withdrawal_deadline} onChange={e => setForm({ ...form, withdrawal_deadline: e.target.value })} />
         </div>
 
-        {/* 提示：修改项目请前往管理项目页面 */}
         <div className="mt-4 mb-4 p-3 bg-blue-50 text-blue-800 rounded-md text-sm">
           提示：如需修改比赛项目（添加/删除/修改项目、设置轮次等），请点击下方“管理项目”按钮。
         </div>

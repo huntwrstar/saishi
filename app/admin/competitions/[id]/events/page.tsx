@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as React from 'react'
+import Link from 'next/link'
 
 const ROUNDS = [
   { value: 1, label: '初赛' },
@@ -11,7 +12,6 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
-// 固定项目名称列表（不可编辑名称）
 const FIXED_NAMES = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
@@ -106,7 +106,6 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
     const calculation_rule = newRule ? 'avg_of_5_trim' : 'avg_of_3'
     const extra_fee = parseFloat(prompt('额外收费金额 (元)', '0') || '0')
     const isTeam = confirm('是否为团队项目？')
-    // 默认轮次：全部四轮
     const rounds = [1,2,3,4]
 
     const { error } = await supabase.from('events').insert({
@@ -128,6 +127,13 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="container py-8 max-w-4xl">
+      {/* 返回按钮 */}
+      <div className="mb-4">
+        <Link href="/admin/competitions" className="text-blue-600 hover:underline">
+          ← 返回管理赛事
+        </Link>
+      </div>
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold">管理项目</h1>
         <button onClick={handleAddEvent} className="btn btn-primary">
@@ -215,7 +221,6 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
                 </div>
               )
             }
-            // 非编辑状态：显示项目信息
             return (
               <div key={event.id} className="card p-4 flex flex-wrap justify-between items-center">
                 <div>

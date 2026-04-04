@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import * as React from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import Link from 'next/link'
 
 const ROUNDS = [
   { value: 1, label: '初赛' },
@@ -216,7 +217,6 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
 
     const { error } = await supabase.from('results').insert(inserts)
     if (!error) {
-      // 同时更新轮次状态
       const currentStatus = event.rounds_status || {}
       currentStatus[round] = roundStatus
       await supabase
@@ -263,6 +263,13 @@ export default function UploadResults({ params }: { params: Promise<{ id: string
 
   return (
     <div className="container py-8 max-w-4xl">
+      {/* 返回按钮 */}
+      <div className="mb-4">
+        <Link href="/admin/competitions" className="text-blue-600 hover:underline">
+          ← 返回管理赛事
+        </Link>
+      </div>
+
       <h1 className="text-xl font-bold mb-6">上传成绩</h1>
       <div className="form-group">
         <label className="form-label">选择项目：</label>
