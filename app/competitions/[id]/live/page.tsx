@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
+export const metadata = {
+  title: '成绩直播 - 鹅城魔方赛事网',
+}
 const ROUNDS = [
   { value: 1, label: '初赛' },
   { value: 2, label: '复赛' },

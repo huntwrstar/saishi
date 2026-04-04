@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+export const metadata = {
+  title: '参赛选手 - 鹅城魔方赛事网',
+}
 export default async function ParticipantsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = await params
 

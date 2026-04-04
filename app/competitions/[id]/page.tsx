@@ -6,6 +6,9 @@ import Link from 'next/link'
 import * as React from 'react'
 import { formatDate, formatDateTime } from '@/lib/format'
 
+export const metadata = {
+  title: '赛事详情 - 鹅城魔方赛事网',
+}
 // 固定项目顺序（与成绩直播页、赛果页保持一致）
 const FIXED_EVENTS_ORDER = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',

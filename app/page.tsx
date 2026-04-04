@@ -3,7 +3,11 @@ export const revalidate = 0;
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { useEffect } from 'react'
 
+export const metadata = {
+  title: '赛事列表 - 鹅城魔方赛事网',
+}
 export default async function Home() {
   const { data: competitions } = await supabase
     .from('competitions')
