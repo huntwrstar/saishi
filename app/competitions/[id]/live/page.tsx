@@ -65,7 +65,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
   const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
-  // 加载排名（返回 registration_id 到 group 索引的映射）
+  // 加载排名的核心函数
   const loadRankings = async (option: Option): Promise<Map<number, number>> => {
     const { data: registrations } = await supabase
       .from('registrations')
@@ -105,7 +105,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     const resultsByReg = new Map()
     results?.forEach(r => resultsByReg.set(r.registration_id, r))
 
-    // 按组聚合
     const groupMap = new Map<string, { group: RankGroup; regIds: number[] }>()
     for (const reg of registrations) {
       const result = resultsByReg.get(reg.id)
@@ -161,16 +160,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     setRankings(finalRanked)
     setRegToGroupIndex(newRegToGroup)
     return newRegToGroup
-  }
-
-  // 更新 options 中指定项目-轮次的状态（实时刷新下拉选项的文字）
-  const updateOptionStatus = (eventId: number, round: number, newStatus: string) => {
-    setOptions(prev => prev.map(opt => {
-      if (opt.eventId === eventId && opt.round === round) {
-        return { ...opt, status: newStatus, statusLabel: STATUS_MAP[newStatus] }
-      }
-      return opt
-    }))
   }
 
   // 初始化数据
@@ -231,7 +220,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       }
       setOptions(opts)
 
-      // 默认选中：优先选进行中，否则第一个
       let defaultOption = opts.find(opt => opt.status === 'in_progress')
       if (!defaultOption && opts.length) defaultOption = opts[0]
       if (defaultOption) {
@@ -256,7 +244,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         { event: '*', schema: 'public', table: 'results' },
         async (payload) => {
           await loadRankings(selectedOption)
-          // 高亮闪烁
           let registrationId: number | null = null
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             registrationId = payload.new.registration_id
@@ -295,16 +282,21 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         async (payload) => {
           const updatedEvent = payload.new
           const newRoundsStatus = updatedEvent.rounds_status || {}
-          // 遍历该项目的所有轮次，更新对应选项的状态
-          const eventOptions = options.filter(opt => opt.eventId === updatedEvent.id)
-          for (const opt of eventOptions) {
-            const newStatus = newRoundsStatus[opt.round] || 'not_started'
-            if (opt.status !== newStatus) {
-              updateOptionStatus(updatedEvent.id, opt.round, newStatus)
+          // 更新 options 中对应选项的状态
+          setOptions(prev => prev.map(opt => {
+            if (opt.eventId === updatedEvent.id) {
+              const newStatus = newRoundsStatus[opt.round] || 'not_started'
+              return { ...opt, status: newStatus, statusLabel: STATUS_MAP[newStatus] }
+            }
+            return opt
+          }))
+          // 如果当前选中的选项是该项目中的某个轮次，且状态发生变化，则更新 selectedOption 的状态标签
+          if (selectedOption && selectedOption.eventId === updatedEvent.id) {
+            const newStatus = newRoundsStatus[selectedOption.round] || 'not_started'
+            if (newStatus !== selectedOption.status) {
+              setSelectedOption(prev => prev ? { ...prev, status: newStatus, statusLabel: STATUS_MAP[newStatus] } : null)
             }
           }
-          // 如果当前选中的选项正好是状态变化的轮次，不需要重新加载排名（因为成绩未变）
-          // 但下拉选项文字已经更新
         }
       )
       .subscribe()
@@ -313,7 +305,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       supabase.removeChannel(resultsChannel)
       supabase.removeChannel(eventsChannel)
     }
-  }, [competitionId, selectedOption, regToGroupIndex, options])
+  }, [competitionId, selectedOption, regToGroupIndex])
 
   // 用户手动切换选项
   const handleOptionChange = async (optionKey: string) => {
