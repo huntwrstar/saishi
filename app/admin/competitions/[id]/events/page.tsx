@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as React from 'react'
-import Link from 'next/link'
 
 const ROUNDS = [
   { value: 1, label: '初赛' },
@@ -12,6 +11,7 @@ const ROUNDS = [
   { value: 4, label: '决赛' },
 ]
 
+// 固定项目名称列表（可多选添加）
 const FIXED_NAMES = [
   '三阶', '二阶', '四阶', '五阶', '六阶', '七阶', '最少步', '三单', '三盲',
   '魔表', '金字塔', '斜转', '五魔方', 'SQ1', '四盲', '五盲', '多盲'
@@ -25,6 +25,12 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<any>({})
   const [saving, setSaving] = useState(false)
+  const [showFixedModal, setShowFixedModal] = useState(false)
+  const [selectedFixed, setSelectedFixed] = useState<string[]>([])
+  const [fixedExtraFee, setFixedExtraFee] = useState(0)
+  const [fixedRounds, setFixedRounds] = useState<number[]>([1,2,3,4])
+  const [fixedIsTeam, setFixedIsTeam] = useState(false)
+  const [addingFixed, setAddingFixed] = useState(false)
 
   const fetchEvents = async () => {
     const { data } = await supabase
@@ -99,14 +105,15 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
     }
   }
 
-  const handleAddEvent = async () => {
+  // 添加自定义项目（弹窗方式）
+  const handleAddCustomEvent = async () => {
     const newName = prompt('请输入新项目名称')
     if (!newName) return
     const newRule = confirm('是否使用“五次去最快最慢取平均”规则？\n确定=五次去最值，取消=三次取平均')
     const calculation_rule = newRule ? 'avg_of_5_trim' : 'avg_of_3'
     const extra_fee = parseFloat(prompt('额外收费金额 (元)', '0') || '0')
     const isTeam = confirm('是否为团队项目？')
-    const rounds = [1,2,3,4]
+    const rounds = [1,2,3,4] // 默认全部轮次，后续可编辑
 
     const { error } = await supabase.from('events').insert({
       competition_id: competitionId,
@@ -123,22 +130,81 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
     }
   }
 
+  // 打开添加固定项目的模态框
+  const openFixedModal = () => {
+    setSelectedFixed([])
+    setFixedExtraFee(0)
+    setFixedRounds([1,2,3,4])
+    setFixedIsTeam(false)
+    setShowFixedModal(true)
+  }
+
+  // 提交添加固定项目
+  const submitFixedEvents = async () => {
+    if (selectedFixed.length === 0) {
+      alert('请至少选择一个固定项目')
+      return
+    }
+    setAddingFixed(true)
+    // 过滤掉已经存在的固定项目（避免重复添加）
+    const existingNames = events.map(e => e.name)
+    const toAdd = selectedFixed.filter(name => !existingNames.includes(name))
+    if (toAdd.length === 0) {
+      alert('所选项目均已存在，无需重复添加')
+      setAddingFixed(false)
+      setShowFixedModal(false)
+      return
+    }
+    const inserts = toAdd.map(name => ({
+      competition_id: competitionId,
+      name,
+      calculation_rule: 'avg_of_5_trim', // 固定项目默认规则
+      extra_fee: fixedExtraFee,
+      is_team: fixedIsTeam,
+      rounds: fixedRounds,
+    }))
+    const { error } = await supabase.from('events').insert(inserts)
+    setAddingFixed(false)
+    if (error) {
+      alert('添加失败：' + error.message)
+    } else {
+      alert(`成功添加 ${toAdd.length} 个固定项目`)
+      setShowFixedModal(false)
+      fetchEvents()
+    }
+  }
+
+  const toggleFixedSelection = (name: string) => {
+    setSelectedFixed(prev =>
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    )
+  }
+
+  const updateFixedRounds = (roundValue: number, checked: boolean) => {
+    let newRounds = [...fixedRounds]
+    if (checked) {
+      if (!newRounds.includes(roundValue)) newRounds.push(roundValue)
+    } else {
+      newRounds = newRounds.filter(r => r !== roundValue)
+    }
+    newRounds.sort((a,b) => a-b)
+    setFixedRounds(newRounds)
+  }
+
   if (loading) return <div className="text-center py-8">加载中...</div>
 
   return (
     <div className="container py-8 max-w-4xl">
-      {/* 返回按钮 */}
-      <div className="mb-4">
-        <Link href="/admin/competitions" className="text-blue-600 hover:underline">
-          ← 返回管理赛事
-        </Link>
-      </div>
-
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold">管理项目</h1>
-        <button onClick={handleAddEvent} className="btn btn-primary">
-          添加自定义项目
-        </button>
+        <div className="space-x-2">
+          <button onClick={openFixedModal} className="btn btn-primary">
+            添加固定项目
+          </button>
+          <button onClick={handleAddCustomEvent} className="btn btn-outline">
+            添加自定义项目
+          </button>
+        </div>
       </div>
 
       {events.length === 0 ? (
@@ -221,6 +287,7 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
                 </div>
               )
             }
+            // 非编辑状态
             return (
               <div key={event.id} className="card p-4 flex flex-wrap justify-between items-center">
                 <div>
@@ -241,6 +308,76 @@ export default function ManageEvents({ params }: { params: Promise<{ id: string 
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* 添加固定项目的模态框 */}
+      {showFixedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[80vh] overflow-auto">
+            <h2 className="text-xl font-bold mb-4">添加固定项目</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">选择项目（可多选）</label>
+              <div className="grid grid-cols-2 gap-2">
+                {FIXED_NAMES.map(name => {
+                  const alreadyExists = events.some(e => e.name === name)
+                  return (
+                    <label key={name} className={`flex items-center gap-1 ${alreadyExists ? 'text-gray-400' : ''}`}>
+                      <input
+                        type="checkbox"
+                        value={name}
+                        checked={selectedFixed.includes(name)}
+                        onChange={() => toggleFixedSelection(name)}
+                        disabled={alreadyExists}
+                      />
+                      {name} {alreadyExists && '(已存在)'}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">额外收费 (元)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="form-input"
+                value={fixedExtraFee}
+                onChange={e => setFixedExtraFee(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={fixedIsTeam}
+                  onChange={e => setFixedIsTeam(e.target.checked)}
+                />
+                团队项目
+              </label>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">轮次（可多选）</label>
+              <div className="flex gap-3">
+                {ROUNDS.map(r => (
+                  <label key={r.value} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={fixedRounds.includes(r.value)}
+                      onChange={(e) => updateFixedRounds(r.value, e.target.checked)}
+                    />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowFixedModal(false)} className="btn btn-outline">取消</button>
+              <button onClick={submitFixedEvents} disabled={addingFixed} className="btn btn-primary">
+                {addingFixed ? '添加中...' : '添加'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
