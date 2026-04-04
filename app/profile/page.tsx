@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { formatDate } from '@/lib/format'
 
+export const metadata = {
+  title: '个人中心 - 鹅城魔方赛事网',
+}
 // 轮次名称映射
 const ROUND_NAMES: Record<number, string> = {
   1: '初赛',
