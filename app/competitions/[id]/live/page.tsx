@@ -52,6 +52,7 @@ interface RankGroup {
   best: number | null
   attemptData: string[]
   rank: number | null
+  groupKey?: string
 }
 
 export default function LivePage({ params }: { params: Promise<{ id: string }> }) {
@@ -62,25 +63,16 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [rankings, setRankings] = useState<RankGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('成绩直播')
-  const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
-  const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
+  const [regToGroupKey, setRegToGroupKey] = useState<Map<number, string>>(new Map())
+  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  // 排名总和相关状态
-  const [showRankSumModal, setShowRankSumModal] = useState(false)
-  const [allEvents, setAllEvents] = useState<any[]>([])
-  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
-  const [rankSumResult, setRankSumResult] = useState<any[]>([])
-  const [calculating, setCalculating] = useState(false)
-
-  // 设置页面标题
   useEffect(() => {
     if (competition) {
       document.title = `成绩直播 - ${competition.name} - 赛事平台`
     }
   }, [competition])
 
-  // 加载排名的核心函数
-  const loadRankings = async (option: Option): Promise<Map<number, number>> => {
+  const loadRankings = async (option: Option): Promise<Map<number, string>> => {
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id, event_id, status, created_at')
@@ -91,7 +83,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
     if (!registrations || registrations.length === 0) {
       setRankings([])
-      setRegToGroupIndex(new Map())
+      setRegToGroupKey(new Map())
       return new Map()
     }
 
@@ -158,25 +150,43 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
 
     let rank = 1
     const finalRanked: RankGroup[] = []
-    const newRegToGroup = new Map<number, number>()
+    const newRegToGroupKey = new Map<number, string>()
     for (let idx = 0; idx < groups.length; idx++) {
       const { group, regIds } = groups[idx]
+      const userKeys = group.users.map(u => u.user_id).sort().join(',')
+      const groupKey = `${option.eventId}_${option.round}_${userKeys}`
       const rankedGroup = {
         ...group,
         rank: group.average !== null ? rank++ : null,
+        groupKey,
       }
       finalRanked.push(rankedGroup)
       for (const regId of regIds) {
-        newRegToGroup.set(regId, idx)
+        newRegToGroupKey.set(regId, groupKey)
       }
     }
 
     setRankings(finalRanked)
-    setRegToGroupIndex(newRegToGroup)
-    return newRegToGroup
+    setRegToGroupKey(newRegToGroupKey)
+    return newRegToGroupKey
   }
 
-  // 初始化数据
+  const triggerHighlight = (registrationId: number, newMapping: Map<number, string>) => {
+    const groupKey = newMapping.get(registrationId)
+    if (!groupKey) return
+    const row = document.querySelector(`tr[data-group-key="${groupKey}"]`) as HTMLElement
+    if (!row) return
+    if (timeoutRefs.current.has(groupKey)) {
+      clearTimeout(timeoutRefs.current.get(groupKey)!)
+    }
+    row.classList.add('highlight-flash')
+    const timeout = setTimeout(() => {
+      row.classList.remove('highlight-flash')
+      timeoutRefs.current.delete(groupKey)
+    }, 3000)
+    timeoutRefs.current.set(groupKey, timeout)
+  }
+
   useEffect(() => {
     const unwrapParams = async () => {
       const { id } = await params
@@ -184,6 +194,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
     unwrapParams()
   }, [params])
+
+  const [allEvents, setAllEvents] = useState<any[]>([])
+  const [showRankSumModal, setShowRankSumModal] = useState(false)
+  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
+  const [rankSumResult, setRankSumResult] = useState<any[]>([])
+  const [calculating, setCalculating] = useState(false)
 
   useEffect(() => {
     if (!competitionId) return
@@ -207,7 +223,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
-      // 保存所有项目（用于排名总和）
       setAllEvents(evts)
 
       const sortedEvents = [...evts].sort((a, b) => {
@@ -249,7 +264,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     fetchInitialData()
   }, [competitionId])
 
-  // 实时订阅：成绩变更 + 轮次状态变更
   useEffect(() => {
     if (!competitionId || !selectedOption) return
 
@@ -259,7 +273,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         'postgres_changes',
         { event: '*', schema: 'public', table: 'results' },
         async (payload) => {
-          await loadRankings(selectedOption)
+          const newMapping = await loadRankings(selectedOption)
           let registrationId: number | null = null
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             registrationId = payload.new.registration_id
@@ -268,22 +282,8 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           }
           if (registrationId) {
             setTimeout(() => {
-              const idx = regToGroupIndex.get(registrationId)
-              if (idx !== undefined) {
-                const row = document.querySelector(`tr[data-group-idx="${idx}"]`) as HTMLElement
-                if (row) {
-                  if (timeoutRefs.current.has(registrationId)) {
-                    clearTimeout(timeoutRefs.current.get(registrationId)!)
-                  }
-                  row.classList.add('highlight-flash')
-                  const timeout = setTimeout(() => {
-                    row.classList.remove('highlight-flash')
-                    timeoutRefs.current.delete(registrationId)
-                  }, 3000)
-                  timeoutRefs.current.set(registrationId, timeout)
-                }
-              }
-            }, 100)
+              triggerHighlight(registrationId, newMapping)
+            }, 150)
           }
         }
       )
@@ -318,7 +318,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       supabase.removeChannel(resultsChannel)
       supabase.removeChannel(eventsChannel)
     }
-  }, [competitionId, selectedOption, regToGroupIndex])
+  }, [competitionId, selectedOption])
 
   const handleOptionChange = async (optionKey: string) => {
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
@@ -327,14 +327,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     await loadRankings(opt)
   }
 
-  // 计算排名总和
   const calculateRankSum = async () => {
     if (selectedEventIds.length === 0) {
       alert('请至少选择一个项目')
       return
     }
     setCalculating(true)
-    // 获取所有报名选手（所有项目）
     const { data: registrations } = await supabase
       .from('registrations')
       .select('id, user_id')
@@ -345,55 +343,109 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       setCalculating(false)
       return
     }
-    const userIds = [...new Set(registrations.map(r => r.user_id))]
+    const allUserIds = [...new Set(registrations.map(r => r.user_id))]
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, username, site_id')
-      .in('id', userIds)
+      .in('id', allUserIds)
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
 
-    // 为每个选手初始化总分和项目排名映射
     const playerScore: Record<string, { total: number; details: Record<number, number | null> }> = {}
-    for (const userId of userIds) {
+    for (const userId of allUserIds) {
       playerScore[userId] = { total: 0, details: {} }
     }
 
-    // 对每个选中的项目，获取该项目的最终轮次（取最大值）的排名
     for (const eventId of selectedEventIds) {
       const event = allEvents.find(e => e.id === eventId)
       if (!event) continue
-      const finalRound = Math.max(...(event.rounds || [1,2,3,4]))
-      // 获取该项目该轮次的排名
+      const finalRound = Math.max(...(event.rounds || [1, 2, 3, 4]))
       const { data: eventRegistrations } = await supabase
         .from('registrations')
         .select('id, user_id')
         .eq('competition_id', competitionId)
         .eq('event_id', eventId)
         .eq('status', 'registered')
-      if (!eventRegistrations || eventRegistrations.length === 0) continue
+      if (!eventRegistrations || eventRegistrations.length === 0) {
+        const rankForMissing = 1
+        for (const userId of allUserIds) {
+          playerScore[userId].total += rankForMissing
+          playerScore[userId].details[eventId] = rankForMissing
+        }
+        continue
+      }
+
       const regIds = eventRegistrations.map(r => r.id)
       const { data: results } = await supabase
         .from('results')
-        .select('registration_id, average')
+        .select('registration_id, average, group_id')
         .in('registration_id', regIds)
         .eq('round', finalRound)
-      // 构建成绩映射，然后排序得到排名
+
       const regToAvg = new Map<number, number>()
       results?.forEach(r => regToAvg.set(r.registration_id, r.average))
-      const regWithAvg = eventRegistrations.filter(reg => regToAvg.has(reg.id))
-      regWithAvg.sort((a, b) => (regToAvg.get(a.id) || Infinity) - (regToAvg.get(b.id) || Infinity))
-      // 分配排名
-      let rank = 1
-      for (const reg of regWithAvg) {
-        const userId = reg.user_id
-        const rankValue = rank++
-        playerScore[userId].total += rankValue
-        playerScore[userId].details[eventId] = rankValue
+
+      const groupToRegs = new Map<string, typeof eventRegistrations>()
+      for (const reg of eventRegistrations) {
+        const result = results?.find(r => r.registration_id === reg.id)
+        const groupId = result?.group_id || `single-${reg.id}`
+        if (!groupToRegs.has(groupId)) groupToRegs.set(groupId, [])
+        groupToRegs.get(groupId)!.push(reg)
       }
-      // 没有成绩的选手不分配排名（细节中不显示）
+
+      const groupScores: { groupId: string; avg: number; regs: typeof eventRegistrations }[] = []
+      for (const [groupId, regs] of groupToRegs.entries()) {
+        let avg: number | null = null
+        for (const reg of regs) {
+          const a = regToAvg.get(reg.id)
+          if (a !== undefined) {
+            avg = a
+            break
+          }
+        }
+        if (avg !== null) {
+          groupScores.push({ groupId, avg, regs })
+        }
+      }
+
+      groupScores.sort((a, b) => a.avg - b.avg)
+      let rank = 1
+      for (let i = 0; i < groupScores.length; i++) {
+        const current = groupScores[i]
+        let currentRank = i + 1
+        if (i > 0 && current.avg === groupScores[i-1].avg) {
+          currentRank = rank
+        } else {
+          rank = currentRank
+        }
+        for (const reg of current.regs) {
+          const userId = reg.user_id
+          playerScore[userId].total += currentRank
+          playerScore[userId].details[eventId] = currentRank
+        }
+      }
+
+      const allGroups = Array.from(groupToRegs.keys())
+      const scoredGroupIds = new Set(groupScores.map(g => g.groupId))
+      const missingGroupIds = allGroups.filter(g => !scoredGroupIds.has(g))
+      const rankForMissing = groupScores.length + 1
+      for (const groupId of missingGroupIds) {
+        const regs = groupToRegs.get(groupId)!
+        for (const reg of regs) {
+          const userId = reg.user_id
+          playerScore[userId].total += rankForMissing
+          playerScore[userId].details[eventId] = rankForMissing
+        }
+      }
+
+      const registeredUserIds = new Set(eventRegistrations.map(r => r.user_id))
+      const missingUserIds = allUserIds.filter(uid => !registeredUserIds.has(uid))
+      const rankForMissingUser = groupScores.length + 1
+      for (const userId of missingUserIds) {
+        playerScore[userId].total += rankForMissingUser
+        playerScore[userId].details[eventId] = rankForMissingUser
+      }
     }
 
-    // 转换为数组并排序（总分越小排名越好）
     const resultArray = Object.entries(playerScore).map(([userId, data]) => ({
       userId,
       username: profileMap.get(userId)?.username || '未知',
@@ -485,7 +537,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                     return (
                       <tr
                         key={idx}
-                        data-group-idx={idx}
+                        data-group-key={group.groupKey}
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>{group.rank ? group.rank : '-'}</td>
@@ -504,7 +556,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* 排名总和模态框 */}
       {showRankSumModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
