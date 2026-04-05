@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase/client'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
-
 const ROUNDS = [
   { value: 1, label: '初赛' },
   { value: 2, label: '复赛' },
@@ -66,11 +65,20 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   const [regToGroupIndex, setRegToGroupIndex] = useState<Map<number, number>>(new Map())
   const timeoutRefs = useRef<Map<number, NodeJS.Timeout>>(new Map())
 
+  // 排名总和相关状态
+  const [showRankSumModal, setShowRankSumModal] = useState(false)
+  const [allEvents, setAllEvents] = useState<any[]>([])
+  const [selectedEventIds, setSelectedEventIds] = useState<number[]>([])
+  const [rankSumResult, setRankSumResult] = useState<any[]>([])
+  const [calculating, setCalculating] = useState(false)
+
+  // 设置页面标题
   useEffect(() => {
-  if (competition) {
-    document.title = `成绩直播 - ${competition.name} - 鹅城魔方赛事网`
-  }
-}, [competition])
+    if (competition) {
+      document.title = `成绩直播 - ${competition.name} - 赛事平台`
+    }
+  }, [competition])
+
   // 加载排名的核心函数
   const loadRankings = async (option: Option): Promise<Map<number, number>> => {
     const { data: registrations } = await supabase
@@ -199,6 +207,9 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         return
       }
 
+      // 保存所有项目（用于排名总和）
+      setAllEvents(evts)
+
       const sortedEvents = [...evts].sort((a, b) => {
         const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
         const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -242,7 +253,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (!competitionId || !selectedOption) return
 
-    // 订阅 results 表（成绩变化）
     const resultsChannel = supabase
       .channel('results-changes')
       .on(
@@ -279,7 +289,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       )
       .subscribe()
 
-    // 订阅 events 表（轮次状态变化）
     const eventsChannel = supabase
       .channel('events-changes')
       .on(
@@ -288,7 +297,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         async (payload) => {
           const updatedEvent = payload.new
           const newRoundsStatus = updatedEvent.rounds_status || {}
-          // 更新 options 中对应选项的状态
           setOptions(prev => prev.map(opt => {
             if (opt.eventId === updatedEvent.id) {
               const newStatus = newRoundsStatus[opt.round] || 'not_started'
@@ -296,7 +304,6 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
             }
             return opt
           }))
-          // 如果当前选中的选项是该项目中的某个轮次，且状态发生变化，则更新 selectedOption 的状态标签
           if (selectedOption && selectedOption.eventId === updatedEvent.id) {
             const newStatus = newRoundsStatus[selectedOption.round] || 'not_started'
             if (newStatus !== selectedOption.status) {
@@ -313,12 +320,90 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
     }
   }, [competitionId, selectedOption, regToGroupIndex])
 
-  // 用户手动切换选项
   const handleOptionChange = async (optionKey: string) => {
     const opt = options.find(o => `${o.eventId}_${o.round}` === optionKey)
     if (!opt) return
     setSelectedOption(opt)
     await loadRankings(opt)
+  }
+
+  // 计算排名总和
+  const calculateRankSum = async () => {
+    if (selectedEventIds.length === 0) {
+      alert('请至少选择一个项目')
+      return
+    }
+    setCalculating(true)
+    // 获取所有报名选手（所有项目）
+    const { data: registrations } = await supabase
+      .from('registrations')
+      .select('id, user_id')
+      .eq('competition_id', competitionId)
+      .eq('status', 'registered')
+    if (!registrations || registrations.length === 0) {
+      alert('暂无报名选手')
+      setCalculating(false)
+      return
+    }
+    const userIds = [...new Set(registrations.map(r => r.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, site_id')
+      .in('id', userIds)
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+
+    // 为每个选手初始化总分和项目排名映射
+    const playerScore: Record<string, { total: number; details: Record<number, number | null> }> = {}
+    for (const userId of userIds) {
+      playerScore[userId] = { total: 0, details: {} }
+    }
+
+    // 对每个选中的项目，获取该项目的最终轮次（取最大值）的排名
+    for (const eventId of selectedEventIds) {
+      const event = allEvents.find(e => e.id === eventId)
+      if (!event) continue
+      const finalRound = Math.max(...(event.rounds || [1,2,3,4]))
+      // 获取该项目该轮次的排名
+      const { data: eventRegistrations } = await supabase
+        .from('registrations')
+        .select('id, user_id')
+        .eq('competition_id', competitionId)
+        .eq('event_id', eventId)
+        .eq('status', 'registered')
+      if (!eventRegistrations || eventRegistrations.length === 0) continue
+      const regIds = eventRegistrations.map(r => r.id)
+      const { data: results } = await supabase
+        .from('results')
+        .select('registration_id, average')
+        .in('registration_id', regIds)
+        .eq('round', finalRound)
+      // 构建成绩映射，然后排序得到排名
+      const regToAvg = new Map<number, number>()
+      results?.forEach(r => regToAvg.set(r.registration_id, r.average))
+      const regWithAvg = eventRegistrations.filter(reg => regToAvg.has(reg.id))
+      regWithAvg.sort((a, b) => (regToAvg.get(a.id) || Infinity) - (regToAvg.get(b.id) || Infinity))
+      // 分配排名
+      let rank = 1
+      for (const reg of regWithAvg) {
+        const userId = reg.user_id
+        const rankValue = rank++
+        playerScore[userId].total += rankValue
+        playerScore[userId].details[eventId] = rankValue
+      }
+      // 没有成绩的选手不分配排名（细节中不显示）
+    }
+
+    // 转换为数组并排序（总分越小排名越好）
+    const resultArray = Object.entries(playerScore).map(([userId, data]) => ({
+      userId,
+      username: profileMap.get(userId)?.username || '未知',
+      siteId: profileMap.get(userId)?.site_id || '未知',
+      total: data.total,
+      details: data.details,
+    }))
+    resultArray.sort((a, b) => a.total - b.total)
+    setRankSumResult(resultArray)
+    setCalculating(false)
   }
 
   const scrollToTop = () => {
@@ -336,7 +421,15 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         </Link>
       </div>
 
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{title} - {competition.name}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{title} - {competition.name}</h1>
+        <button
+          onClick={() => setShowRankSumModal(true)}
+          style={{ backgroundColor: '#10b981', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer' }}
+        >
+          排名总和
+        </button>
+      </div>
 
       <div style={{ marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>选择项目与轮次：</label>
@@ -377,7 +470,7 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                 <thead>
                   <tr>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>排名</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>NO.</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>报名序号</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>选手</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>平均</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>最好</th>
@@ -408,6 +501,78 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 排名总和模态框 */}
+      {showRankSumModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">排名总和计算</h2>
+              <button onClick={() => setShowRankSumModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">选择项目（多选）</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {allEvents.map(event => (
+                  <label key={event.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      value={event.id}
+                      checked={selectedEventIds.includes(event.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedEventIds([...selectedEventIds, event.id])
+                        } else {
+                          setSelectedEventIds(selectedEventIds.filter(id => id !== event.id))
+                        }
+                      }}
+                    />
+                    {event.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={calculateRankSum}
+              disabled={calculating}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md mb-4"
+            >
+              {calculating ? '计算中...' : '计算排名总和'}
+            </button>
+            {rankSumResult.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-2 border">总分排名</th>
+                      <th className="px-4 py-2 border">选手姓名</th>
+                      <th className="px-4 py-2 border">网站ID</th>
+                      <th className="px-4 py-2 border">总分</th>
+                      <th className="px-4 py-2 border">各项目排名详情</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankSumResult.map((item, idx) => (
+                      <tr key={item.userId} className="border-b">
+                        <td className="px-4 py-2 text-center">{idx + 1}</td>
+                        <td className="px-4 py-2">{item.username}</td>
+                        <td className="px-4 py-2">{item.siteId}</td>
+                        <td className="px-4 py-2 text-center">{item.total}</td>
+                        <td className="px-4 py-2">
+                          {Object.entries(item.details).map(([eventId, rank]) => {
+                            const eventName = allEvents.find(e => e.id === parseInt(eventId))?.name || eventId
+                            return <div key={eventId}>{eventName}: {rank}名</div>
+                          })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

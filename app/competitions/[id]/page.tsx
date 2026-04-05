@@ -1,11 +1,10 @@
 'use client'
 import { supabase } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as React from 'react'
 import { formatDate, formatDateTime } from '@/lib/format'
-
 
 // 固定项目顺序（与成绩直播页、赛果页保持一致）
 const FIXED_EVENTS_ORDER = [
@@ -49,12 +48,40 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [selectedEvents, setSelectedEvents] = useState<number[]>([])
+  // 关于比赛的展开状态
+  const [detailsOpen, setDetailsOpen] = useState(true)
+  const autoCloseTimer = useRef<NodeJS.Timeout | null>(null)
 
+  // 设置页面标题
   useEffect(() => {
     if (competition) {
-      document.title = `${competition.name} - 鹅城魔方赛事网`
+      document.title = `${competition.name} - 赛事平台`
     }
   }, [competition])
+
+  // 自动收起逻辑
+  useEffect(() => {
+    if (detailsOpen && competition) {
+      // 如果有定时器先清除
+      if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current)
+      autoCloseTimer.current = setTimeout(() => {
+        setDetailsOpen(false)
+        autoCloseTimer.current = null
+      }, 10000) // 10秒
+    }
+    return () => {
+      if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current)
+    }
+  }, [detailsOpen, competition])
+
+  const handleDetailsToggle = (open: boolean) => {
+    setDetailsOpen(open)
+    // 如果用户手动展开，清除自动收起的定时器
+    if (open && autoCloseTimer.current) {
+      clearTimeout(autoCloseTimer.current)
+      autoCloseTimer.current = null
+    }
+  }
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -72,7 +99,6 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
       .select('*')
       .eq('competition_id', competitionId)
 
-    // 排序：固定项目按预定义顺序，自定义项目按 id 升序
     const sortedEvents = (evts || []).sort((a, b) => {
       const aIndex = FIXED_EVENTS_ORDER.indexOf(a.name)
       const bIndex = FIXED_EVENTS_ORDER.indexOf(b.name)
@@ -216,19 +242,27 @@ export default function CompetitionDetail({ params }: { params: Promise<{ id: st
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>{competition.name}</h1>
         <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <p>日期：{formatDate(competition.datetime)}</p>
-<p>基础报名费：¥{competition.base_fee}</p>
-{competition.registration_start && (
-  <p>报名时间：{formatDateTime(competition.registration_start)} - {competition.registration_end ? formatDateTime(competition.registration_end) : '无结束'}</p>
-)}
-<p>退赛截止：{competition.withdrawal_deadline ? formatDateTime(competition.withdrawal_deadline) : '无'}</p>
+          <p>地点：{competition.location}</p>
+          <p>基础报名费：¥{competition.base_fee}</p>
+          {competition.registration_start && (
+            <p>报名时间：{formatDateTime(competition.registration_start)} - {competition.registration_end ? formatDateTime(competition.registration_end) : '无结束'}</p>
+          )}
+          <p>退赛截止：{competition.withdrawal_deadline ? formatDateTime(competition.withdrawal_deadline) : '无'}</p>
         </div>
-        <details style={{ marginBottom: '1rem' }}>
-          <summary style={{ color: '#3b82f6', cursor: 'pointer' }}>关于比赛</summary>
-          <div
-            style={{ marginTop: '0.5rem' }}
-            dangerouslySetInnerHTML={{ __html: competition.description || '' }}
-          />
-        </details>
+        <div style={{ marginBottom: '1rem' }}>
+          <summary
+            style={{ color: '#3b82f6', cursor: 'pointer', listStyle: 'none', display: 'inline-block' }}
+            onClick={() => handleDetailsToggle(!detailsOpen)}
+          >
+            {detailsOpen ? '▼ 关于比赛' : '▶ 关于比赛'}
+          </summary>
+          {detailsOpen && (
+            <div
+              style={{ marginTop: '0.5rem' }}
+              dangerouslySetInnerHTML={{ __html: competition.description || '' }}
+            />
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {!competition.is_finished && new Date() > new Date(competition.datetime) && (
             <Link href={`/competitions/${competition.id}/live`} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', textDecoration: 'none' }}>
