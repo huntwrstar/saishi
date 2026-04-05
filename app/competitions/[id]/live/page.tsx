@@ -477,7 +477,21 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{title} - {competition.name}</h1>
         <button
           onClick={() => setShowRankSumModal(true)}
-          style={{ backgroundColor: '#10b981', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', cursor: 'pointer' }}
+          style={{
+            backgroundColor: '#10b981',
+            color: 'white',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: '500',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'background-color 0.2s, transform 0.1s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#059669')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#10b981')}
+          onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
+          onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         >
           排名总和
         </button>
@@ -557,17 +571,25 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
       )}
 
       {showRankSumModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">排名总和计算</h2>
-              <button onClick={() => setShowRankSumModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ backdropFilter: 'blur(2px)' }}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-auto transform transition-all">
+            <div className="flex justify-between items-center mb-5 border-b pb-3">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                排名总和计算
+              </h2>
+              <button
+                onClick={() => setShowRankSumModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                ×
+              </button>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">选择项目（多选）</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">选择项目（多选）</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-lg">
                 {allEvents.map(event => (
-                  <label key={event.id} className="flex items-center gap-2">
+                  <label key={event.id} className="flex items-center gap-2 text-sm hover:bg-gray-100 p-1 rounded transition">
                     <input
                       type="checkbox"
                       value={event.id}
@@ -579,42 +601,58 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
                           setSelectedEventIds(selectedEventIds.filter(id => id !== event.id))
                         }
                       }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    {event.name}
+                    <span>{event.name}</span>
                   </label>
                 ))}
               </div>
             </div>
-            <button
-              onClick={calculateRankSum}
-              disabled={calculating}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md mb-4"
-            >
-              {calculating ? '计算中...' : '计算排名总和'}
-            </button>
+            <div className="flex justify-center mb-6">
+              <button
+                onClick={calculateRankSum}
+                disabled={calculating}
+                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ transform: 'translateY(0)' }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = 'translateY(1px)')}
+                onMouseUp={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+              >
+                {calculating ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    计算中...
+                  </span>
+                ) : (
+                  '计算排名总和'
+                )}
+              </button>
+            </div>
             {rankSumResult.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-4 py-2 border">总分排名</th>
-                      <th className="px-4 py-2 border">选手姓名</th>
-                      <th className="px-4 py-2 border">网站ID</th>
-                      <th className="px-4 py-2 border">总分</th>
-                      <th className="px-4 py-2 border">各项目排名详情</th>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总分排名</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">选手姓名</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">网站ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总分</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">各项目排名详情</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="bg-white divide-y divide-gray-200">
                     {rankSumResult.map((item, idx) => (
-                      <tr key={item.userId} className="border-b">
-                        <td className="px-4 py-2 text-center">{idx + 1}</td>
-                        <td className="px-4 py-2">{item.username}</td>
-                        <td className="px-4 py-2">{item.siteId}</td>
-                        <td className="px-4 py-2 text-center">{item.total}</td>
-                        <td className="px-4 py-2">
+                      <tr key={item.userId} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{idx + 1}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.username}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{item.siteId}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{item.total}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
                           {Object.entries(item.details).map(([eventId, rank]) => {
                             const eventName = allEvents.find(e => e.id === parseInt(eventId))?.name || eventId
-                            return <div key={eventId}>{eventName}: {rank}名</div>
+                            return <div key={eventId} className="inline-block bg-gray-100 rounded-full px-2 py-0.5 text-xs mr-1 mb-1">{eventName}: {rank}名</div>
                           })}
                         </td>
                       </tr>
@@ -643,7 +681,12 @@ export default function LivePage({ params }: { params: Promise<{ id: string }> }
           cursor: 'pointer',
           fontSize: '1.25rem',
           lineHeight: '1',
+          transition: 'background-color 0.2s, transform 0.1s',
         }}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#3b82f6')}
+        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         aria-label="回到顶部"
       >
         ↑
